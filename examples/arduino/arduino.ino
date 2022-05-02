@@ -1,6 +1,8 @@
 #include <embedit.h>
 
-Embedit<> edit;
+void putc(const char c) { Serial.print(c); }
+
+Embedit<> edit(putc);
 
 void setup() {
 }

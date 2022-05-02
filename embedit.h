@@ -8,37 +8,27 @@
 #ifndef EMBEDIT_H
 #define EMBEDIT_H
 
-#ifdef ARDUINO
-#include <Arduino.h>
-#endif
+#include "history.h"
 
-template<typename T, size_t N>
-class Queue {
-private:
-  size_t _size;    // capacity of FIFO
-  size_t _head;    // oldest elem in FIFO is at index _head
-  size_t _tail;    // new elems are enqueued at index _tail
-  T      _elem[N]; // statically-sized FIFO
-public:
-  Queue(): 
-    _size(N), 
-    _head(0), 
-    _tail(0) {
-  }
-  ~Queue() {}
-};
+typedef void (*putcFunc)(const char c);
 
 template<size_t maxLineBytes = 128, size_t maxHistLines = 64>
 class Embedit {
-private:
-  Queue<Queue<char, maxLineBytes>, maxHistLines> _history;
+protected:
+  putcFunc _putc;
+
 public:
-  Embedit(void) {
-  }
-  ~Embedit(void) {
-  }
+  History<maxLineBytes, maxHistLines> history;
 
+  Embedit(const putcFunc putc):
+    _putc(putc) {}
+
+  ~Embedit(void) {}
+
+  void putc(const char c)  { if (_putc) { _putc(c); } }
+  void puts(const char *s) { while (*s) { putc(*s++); } }
+
+  void puts(const std::string &str) { puts(str.c_str()); }
 };
-
 
 #endif // EMBEDIT_H
