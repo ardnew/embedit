@@ -9,7 +9,7 @@ import (
 
 // R defines a type with the same interface as one of the RegisterN types from
 // package "runtime/volatile" of TinyGo.
-// It may be substituted in place of the RegisterN type for testing Fifo logic
+// It may be substituted in place of the RegisterN type for testing FIFO logic
 // on a regular PC with standard Go, which does not provide "runtime/volatile".
 type R uint32
 
@@ -41,7 +41,7 @@ func (m OverflowMode) String() string {
 }
 
 // Data defines the interface for elements of a FIFO, enabling any arbitrary,
-// concrete type be used as a FIFO's elements.
+// concrete type be used as FIFO elements' type.
 type Data interface{}
 
 // Buffer defines the interface for the user-defined type that stores elements
@@ -54,93 +54,103 @@ type Buffer interface {
 	String() string
 }
 
-// State contains the state and configuration of a generalized queue data
-// structure. The queue itself is represented by any user-defined type that
-// implements the Buffer interface.
+// State contains the state and configuration of a statically-sized, circular
+// FIFO (queue) data structure.
+// The FIFO itself is represented by any user-defined type that implements the
+// Buffer interface.
 type State struct {
-	mode OverflowMode
-	capa R // volatile.Register32
 	buff Buffer
-	head R // volatile.Register32 // Oldest element in queue is at index head
-	tail R // volatile.Register32 // New elements are enqueued at index tail
+	capa R
+	head R
+	tail R
+	mode OverflowMode
 }
 
 // Error values returned by methods of type State.
 var (
-	ErrFifoReadZero    = errors.New("copy into zero-length buffer")
-	ErrFifoWriteZero   = errors.New("copy from zero-length buffer")
-	ErrFifoEmpty       = errors.New("buffer empty") // Read underrun
-	ErrFifoFull        = errors.New("buffer full")  // Write overrun
-	ErrFifoDiscardMode = errors.New("unknown discard mode")
+	ErrReceiver    = errors.New("nil receiver")
+	ErrReadZero    = errors.New("copy into zero-length buffer")
+	ErrWriteZero   = errors.New("copy from zero-length buffer")
+	ErrNil         = errors.New("nil buffer")
+	ErrEmpty       = errors.New("buffer empty") // Read underrun
+	ErrFull        = errors.New("buffer full")  // Write overrun
+	ErrDiscardMode = errors.New("unknown discard mode")
 )
 
 // New allocates and initializes a new State with the given paramters and
-// returns a pointer to this fully-initialized State.
+// returns a pointer to the fully-initialized struct.
 func New(buff Buffer, capa int, mode OverflowMode) *State {
-	fifo := State{}
-	fifo.Init(buff, capa, mode)
-	return &fifo
+	return new(State).Init(buff, capa, mode)
 }
 
-// Init initializes the receiver queue's backing data store with the given
-// buffer buff, logical capacity capa, and discard rule mode.
-// If capa is greater than the buffer's physical length, uses the buffer's
-// physical length.
-func (q *State) Init(buff Buffer, capa int, mode OverflowMode) {
-	q.mode = mode
-	q.buff = buff
-	q.Reset(capa)
+// Init initializes the receiver State's backing data store with the given
+// Buffer buff, FIFO logical capacity capa, and OverflowMode mode.
+// Refer to State.Reset for additional constraints and semantics.
+// Returns the receiver for convenient initialization call chains.
+func (s *State) Init(buff Buffer, capa int, mode OverflowMode) *State {
+	s.mode = mode
+	s.buff = buff
+	s.Reset(capa)
+	return s
 }
 
 // Reset discards all buffered data and sets the FIFO logical capacity.
 // If capa is less than 0 or greater than buffer's physical length, uses the
 // buffer's physical length.
+//
 //go:inline
-func (q *State) Reset(capa int) {
-	if q.buff != nil {
-		if phy := q.buff.Len(); 0 > capa || capa > phy {
+func (s *State) Reset(capa int) {
+	if s.buff != nil {
+		if phy := s.buff.Len(); 0 > capa || capa > phy {
 			capa = phy
 		}
 	}
-	q.capa.Set(uint32(capa))
-	q.head.Set(0)
-	q.tail.Set(0)
+	s.capa.Set(uint32(capa))
+	s.head.Set(0)
+	s.tail.Set(0)
 }
 
 // Cap returns the logical capacity of the receiver FIFO.
+// The FIFO can hold at most Cap-1 elements.
+//
 //go:inline
-func (q *State) Cap() int {
-	return int(q.capa.Get())
+func (s *State) Cap() int {
+	return int(s.capa.Get())
 }
 
 // Len returns the number of elements enqueued in the receiver FIFO.
+//
 //go:inline
-func (q *State) Len() int {
-	return int(q.tail.Get() - q.head.Get())
+func (s *State) Len() int {
+	return int(s.tail.Get() - s.head.Get())
 }
 
 // Rem returns the number of elements not enqueued in the receiver FIFO.
+//
 //go:inline
-func (q *State) Rem() int {
-	return q.Cap() - q.Len()
+func (s *State) Rem() int {
+	rem := (s.Cap() - 1) - s.Len()
+	if rem <= 0 {
+		return 0
+	}
+	return rem
 }
 
 // Deq dequeues and returns the element at the front of the receiver FIFO and
 // true.
 // If the FIFO is empty and no element was dequeued, returns nil and false.
-func (q *State) Deq() (data Data, ok bool) {
-	if q == nil {
-		return // invalid receiver
+func (s *State) Deq() (data Data, ok bool) {
+	if s == nil {
+		return // Invalid receiver
 	}
-	head := q.head.Get()
-	if head == q.tail.Get() {
-		return // empty queue
+	if s.buff == nil {
+		return // Uninitialized buffer
 	}
-	if q.buff == nil {
-		return // uninitialized buffer
+	if s.Len() == 0 {
+		return // Empty queue
 	}
-	if data, ok = q.buff.Get(int(head % q.capa.Get())); ok {
-		q.head.Set(head + 1)
+	if data, ok = s.buff.Get(int(s.head.Get() % s.capa.Get())); ok {
+		s.head.Set(s.head.Get() + 1)
 	}
 	return
 }
@@ -149,169 +159,168 @@ func (q *State) Deq() (data Data, ok bool) {
 // returns true.
 // If the FIFO is full and no element can be enqueued, returns false.
 //
-// TODO(ardnew): Document both operations based on receiver's FifoFullMode.
-func (q *State) Enq(data Data) (ok bool) {
-	if q == nil {
-		return // invalid receiver
+// TODO(ardnew): Document both operations based on receiver's OverflowMode.
+func (s *State) Enq(data Data) (ok bool) {
+	if s == nil {
+		return // Invalid receiver
 	}
-	tail := q.tail.Get()
-	head := q.head.Get()
-	if q.Len() == int(q.capa.Get())-1 {
-		// full queue:
-		switch q.mode {
-		case DiscardLast: // drop incoming data
+	if s.buff == nil {
+		return // Uninitialized buffer
+	}
+	if s.Rem() == 0 {
+		// Full queue:
+		switch s.mode {
+		case DiscardLast: // Drop incoming data
 			return
-		case DiscardFirst: // drop outgoing data
-			q.head.Set(head + 1)
+		case DiscardFirst: // Drop outgoing data
+			s.head.Set(s.head.Get() + 1)
 		}
 	}
-	if q.buff == nil {
-		return // uninitialized buffer
-	}
-	if ok = q.buff.Set(int(tail%q.capa.Get()), data); ok {
-		q.tail.Set(tail + 1)
+	if ok = s.buff.Set(int(s.tail.Get()%s.capa.Get()), data); ok {
+		s.tail.Set(s.tail.Get() + 1)
 	}
 	return
 }
 
-// Read implements the io.Reader interface. It dequeues min(q.Len(), len(data))
+// Read implements the io.Reader interface. It dequeues min(s.Len(), len(data))
 // elements from the receiver FIFO into the given slice data.
-// If len(data) equals 0, returns 0 and ErrReadBuffer.
-// Otherwise, if q.Len() equals 0, returns 0 and ErrFifoEmpty.
-func (q *State) Read(data []Data) (int, error) {
-	less := uint32(len(data))
+// If len(data) equals 0, returns 0 and ErrReadZero.
+// Otherwise, if s.Len() equals 0, returns 0 and ErrEmpty.
+func (s *State) Read(data []Data) (n int, err error) {
+	if s == nil {
+		return 0, ErrReceiver
+	}
+	if s.buff == nil {
+		return 0, ErrNil
+	}
+	// FIFO empty, cannot read any data.
+	if s.Len() == 0 {
+		return 0, ErrEmpty
+	}
+	less := len(data)
+	// Nowhere to write data, output buffer size is 0.
 	if less == 0 {
-		return 0, ErrFifoReadZero
-	} // nothing to copy into
-
-	head := q.head.Get()
-	used := q.tail.Get() - head
-
-	if used == 0 {
-		return 0, ErrFifoEmpty
-	} // empty queue
-
-	if less > used {
-		less = used
-	} // only get from used space
-
-	for i := uint32(0); i < less; i++ {
-		data[i], _ = q.buff.Get(int(head % q.capa.Get()))
+		return 0, ErrReadZero
+	}
+	// Only get from used space.
+	if less > s.Len() {
+		less = s.Len()
+	}
+	head := s.head.Get()
+	for i := 0; i < less; i++ {
+		data[i], _ = s.buff.Get(int(head % s.capa.Get()))
 		head++
 	}
-	q.head.Set(head)
-
-	return int(less), nil
+	s.head.Set(head)
+	return less, nil
 }
 
-// Write implements the io.Writer interface. It enqueues min(q.Rem(), len(data))
+// Write implements the io.Writer interface. It enqueues min(s.Rem(), len(data))
 // elements from the given slice data into the receiver FIFO.
-// If len(data) equals 0, returns 0 and ErrWriteBuffer.
-// Otherwise, if q.Rem() equals 0, returns 0 and ErrFifoFull.
+// If len(data) equals 0, returns 0 and ErrWriteZero.
+// Otherwise, if s.Rem() equals 0, returns 0 and ErrFull.
 //
-// TODO(ardnew): Document both operations based on receiver's FifoFullMode.
-func (q *State) Write(data []Data) (int, error) {
-	more := uint32(len(data))
-
+// TODO(ardnew): Document both operations based on receiver's OverflowMode.
+func (s *State) Write(data []Data) (int, error) {
+	if s == nil {
+		return 0, ErrReceiver
+	}
+	if s.buff == nil {
+		return 0, ErrNil
+	}
+	more := len(data)
 	// Nothing to copy from is an error regardless of mode.
 	if more == 0 {
-		return 0, ErrFifoWriteZero
+		return 0, ErrWriteZero
 	}
-
-	switch q.mode {
-	case DiscardLast:
-		// drop incoming data
-
-		tail := q.tail.Get()
-		used := tail - q.head.Get()
-
-		// Full queue, cannot add any data.
-		if used == q.capa.Get() {
-			return 0, ErrFifoFull
+	// Do not attempt writing if FIFO capacity is zero.
+	if s.Cap() == 0 {
+		return 0, ErrFull
+	}
+	switch s.mode {
+	case DiscardLast: // Drop incoming data
+		// FIFO full, cannot add any data.
+		if s.Rem() == 0 {
+			return 0, ErrFull
 		}
-
 		// Only put to unused space.
-		if used+more > q.capa.Get() {
-			more = q.capa.Get() - used
+		if more > s.Rem() {
+			more = s.Rem()
 		}
-
 		// Copy a potentially-limited number of elements from data, depending on the
 		// current length of FIFO.
-		for i := uint32(0); i < more; i++ {
-			if q.buff.Set(int(tail%q.capa.Get()), data[i]) {
+		tail := s.tail.Get()
+		for i := 0; i < more; i++ {
+			if s.buff.Set(int(tail%s.capa.Get()), data[i]) {
 				tail++
 			}
 		}
-		q.tail.Set(tail)
+		s.tail.Set(tail)
+		return more, nil
 
-		return int(more), nil
-
-	case DiscardFirst:
-		// drop outgoing data
-
+	case DiscardFirst: // Drop outgoing data
 		// Trying to write more data than the FIFO will hold will simply overwrite
 		// some of the given data, so there is no point writing that data.
-		from := uint32(0)
-		if more >= q.capa.Get() {
+		from := 0
+		if more >= int(s.capa.Get()) {
 			// Begin copying only the data that will be kept.
-			from = more - q.capa.Get()
+			from = more - int(s.capa.Get()) + 1
 			// We can fill the entire FIFO.
-			more = q.capa.Get()
-			// Reset the indices
-			q.head.Set(0)
-			q.tail.Set(0)
+			more = int(s.capa.Get())
+			// Reset the indices.
+			s.head.Set(0)
+			s.tail.Set(0)
 		}
-
-		tail := q.tail.Get()
-		used := tail - q.head.Get()
-
+		// tail := s.tail.Get()
+		// used := tail - s.head.Get()
 		// Make space for incoming data by discarding only as many FIFO elements as
 		// is necessary to store incoming data.
-		if used+more > q.capa.Get() {
-			q.head.Set(tail + more - q.capa.Get())
+		if more > s.Rem() {
+			s.head.Set(s.head.Get() + uint32(more-s.Rem()))
 		}
-
-		// Copy a potentially-limited number of elements from data, depending on the
+		// Copy a potentially limited number of elements from data, depending on the
 		// current length of FIFO.
-		for i := uint32(0); i < more; i++ {
-			if q.buff.Set(int(tail%q.capa.Get()), data[from+i]) {
+		tail := s.tail.Get()
+		for i := 0; i < more; i++ {
+			if s.buff.Set(int(tail%s.capa.Get()), data[from+i]) {
 				tail++
 			}
 		}
-		q.tail.Set(tail)
-
+		s.tail.Set(tail)
 		return int(more), nil
 	}
-
-	return 0, ErrFifoDiscardMode
+	return 0, ErrDiscardMode
 }
 
 // First returns the next element that would be dequeued from the receiver FIFO
 // and true.
 // If the FIFO is empty and no element would be dequeued, returns nil and false.
-func (q *State) First() (Data, bool) { return q.Get(0) }
+func (s *State) First() (Data, bool) { return s.Get(0) }
 
 // Last returns the last element that would be dequeued from the receiver FIFO
 // and true.
 // If the FIFO is empty and no element would be dequeued, returns nil and false.
-func (q *State) Last() (Data, bool) { return q.Get(-1) }
+func (s *State) Last() (Data, bool) { return s.Get(-1) }
 
-// index returns an index into the receiver FIFO based on sign and magnitude of i:
-// 1. If i is greater than or equal to zero and less then q.Len(), returns the
-//    index of the (i+1)'th element that would be dequeued from the receiver FIFO
-//    and true.
-// 2. Otherwise, if i is negative and -i is less than or equal to q.Len(), returns
-//    the index of the (q.Len()-i+1)'th element that would be dequeued from the
-//    receiver FIFO and true.
-// 3. Otherwise, returns 0 and false.
-func (q *State) index(i int) (int, bool) {
-	if n := q.Len(); i < 0 {
+// index returns an index into the receiver FIFO based on sign/magnitude of i.
+//
+// If i is greater than or equal to zero and less then s.Len(), returns the
+// index of the (i+1)'th element that would be dequeued from the receiver FIFO
+// and true.
+//
+// Otherwise, if i is negative and -i is less than or equal to s.Len(), returns
+// the index of the (s.Len()-i+1)'th element that would be dequeued from the
+// receiver FIFO and true.
+//
+// Otherwise, returns 0 and false.
+func (s *State) index(i int) (int, bool) {
+	if n := s.Len(); i < 0 {
 		if -i <= n {
-			return (int(q.tail.Get()) + i) % int(q.capa.Get()), true
+			return (int(s.tail.Get()) + i) % int(s.capa.Get()), true
 		}
 	} else {
 		if i < n {
-			return (int(q.head.Get()) + i) % int(q.capa.Get()), true
+			return (int(s.head.Get()) + i) % int(s.capa.Get()), true
 		}
 	}
 	return 0, false
@@ -320,21 +329,23 @@ func (q *State) index(i int) (int, bool) {
 // Get returns the value of an element in the receiver FIFO, offset by i from the
 // front of the queue if i is positive, or from the back of the queue if i is
 // negative. For example:
-//  	Get(0)  == Get(-Len())  == First(), and
-// 		Get(-1) == Get(Len()-1) == Last().
+//
+//	Get(0)  == Get(-Len())  == First(), and
+//	Get(-1) == Get(Len()-1) == Last().
+//
 // If the offset is beyond queue boundaries, returns 0 and false.
-func (q *State) Get(i int) (Data, bool) {
-	if n, ok := q.index(i); ok {
-		return q.buff.Get(n)
+func (s *State) Get(i int) (Data, bool) {
+	if n, ok := s.index(i); ok {
+		return s.buff.Get(n)
 	}
 	return nil, false
 }
 
 // Set modifies the value of an element in the receiver FIFO.
 // Set uses the same logic as Get to select an element in the FIFO.
-func (q *State) Set(i int, data Data) bool {
-	if n, ok := q.index(i); ok {
-		return q.buff.Set(n, data)
+func (s *State) Set(i int, data Data) bool {
+	if n, ok := s.index(i); ok {
+		return s.buff.Set(n, data)
 	}
 	return false
 }
@@ -342,21 +353,20 @@ func (q *State) Set(i int, data Data) bool {
 // Remove removes and returns the value of an element from the receiver FIFO,
 // moving all trailing elements forward in queue. Reduces FIFO length by 1.
 // Remove uses the same logic as Get to select an element in the FIFO.
-func (q *State) Remove(i int) (Data, bool) {
-	head := q.head.Get()
-	tail := q.tail.Get()
+func (s *State) Remove(i int) (Data, bool) {
+	head := s.head.Get()
+	tail := s.tail.Get()
 	if head == tail {
-		return nil, false
-	} // empty queue
-
-	// copy each element at index n+1 to index n, for n>=i.
-	if data, ok := q.Get(i); ok {
+		return nil, false // Empty queue
+	}
+	// Copy each element at index n+1 to index n, for n>=i.
+	if data, ok := s.Get(i); ok {
 		for n := i; n < int(tail-head)-1; n++ {
-			if t, ok := q.Get(n + 1); ok {
-				_ = q.Set(n, t)
+			if t, ok := s.Get(n + 1); ok {
+				_ = s.Set(n, t)
 			}
 		}
-		q.tail.Set(tail - 1)
+		s.tail.Set(tail - 1)
 		return data, true
 	}
 	return nil, false
@@ -366,32 +376,32 @@ func (q *State) Remove(i int) (Data, bool) {
 // index backward in queue, and copies the given data into the queue at that
 // index.
 // Insert uses the same logic as Get to select an insertion index in the FIFO.
-// func (q *Fifo) Insert(i int, data FifoData) bool {
+// func (s *Fifo) Insert(i int, data FifoData) bool {
 
-// 	head := q.head.Get()
-// 	tail := q.tail.Get()
-// 	if tail-head == q.capa.Get() {
+// 	head := s.head.Get()
+// 	tail := s.tail.Get()
+// 	if tail-head == s.capa.Get() {
 // 		// queue is full, decide if we are removing the first or last element to
 // 		// make room for the insertion
-// 		switch q.mode {
+// 		switch s.mode {
 // 		case FifoFullDiscardLast: // drop last
 
 // 		case FifoFullDiscardFirst: // drop first
 
 // 			for n := 0; n < i; n++ {
-// 				if t, ok := q.Get(n + 1); ok {
-// 					_ = q.Set(n, t)
+// 				if t, ok := s.Get(n + 1); ok {
+// 					_ = s.Set(n, t)
 // 				}
 // 			}
-// 			q.Set(i, data)
+// 			s.Set(i, data)
 // 		}
 // 	}
 
 // 	// copy each element at index n to index n+1, for n>=i.
-// 	if data, ok := q.Get(i); ok {
-// 		for n := i; n < q.Len()-1; n++ {
-// 			if t, ok := q.Get(n + 1); ok {
-// 				_ = q.Set(n, t)
+// 	if data, ok := s.Get(i); ok {
+// 		for n := i; n < s.Len()-1; n++ {
+// 			if t, ok := s.Get(n + 1); ok {
+// 				_ = s.Set(n, t)
 // 			}
 // 		}
 // 		return data, true
@@ -399,22 +409,18 @@ func (q *State) Remove(i int) (Data, bool) {
 // 	return nil, false
 // }
 
-func (q *State) String() string {
-	if q == nil {
+func (s *State) String() string {
+	if s == nil {
 		return "<nil>"
 	}
 	var sb strings.Builder
 	sb.WriteRune('{')
-	sb.WriteString("mode:" + q.mode.String() + ", ")
-	sb.WriteString("capa:" + strconv.FormatUint(uint64(q.capa.Get()), 10) + ", ")
-	sb.WriteString("head:" + strconv.FormatUint(uint64(q.head.Get()), 10) + "[" + strconv.FormatUint(uint64(q.head.Get()), 10) + "], ")
-	sb.WriteString("tail:" + strconv.FormatUint(uint64(q.tail.Get()), 10) + "[" + strconv.FormatUint(uint64(q.tail.Get()), 10) + "], ")
-	sb.WriteString("size:" + strconv.FormatUint(uint64(q.Len()), 10) + "], ")
-	// if q.buff != nil {
-	sb.WriteString("buff:" + q.buff.String())
-	// } else {
-	// sb.WriteString("buff:<nil>")
-	// }
+	sb.WriteString("mode:" + s.mode.String() + ", ")
+	sb.WriteString("capa:" + strconv.FormatUint(uint64(s.capa.Get()), 10) + ", ")
+	sb.WriteString("head:" + strconv.FormatUint(uint64(s.head.Get()), 10) + "[" + strconv.FormatUint(uint64(s.head.Get()), 10) + "], ")
+	sb.WriteString("tail:" + strconv.FormatUint(uint64(s.tail.Get()), 10) + "[" + strconv.FormatUint(uint64(s.tail.Get()), 10) + "], ")
+	sb.WriteString("size:" + strconv.FormatUint(uint64(s.Len()), 10) + "], ")
+	sb.WriteString("buff:" + s.buff.String())
 	sb.WriteRune('}')
 	return sb.String()
 }

@@ -10,30 +10,6 @@ type RuneBuffer []rune
 
 const z = rune(0)
 
-// NewRuneBuffer returns a pointer to a RuneBuffer that is allocated based on
-// the given var args size.
-//
-// The same semantics used to allocate a slice with the make built-in function
-// are also used[1][2] to allocate the slice returned from NewRuneBuffer.
-//
-// Namely, the first argument is used as the size of the created slice, and
-// the second argument is used as the capacity of the created slice.
-// +———————————————————————————————————————————————————————————————————————————
-// | [1] Except for the case in which no arguments are given:
-// |     • make          — syntax/compiler error
-// |     • NewRuneBuffer — allocates the zero value (RuneBuffer{})
-// | [2] Except for the case in which invalid (negative) arguments are given:
-// |     • make          — syntax/compiler error
-// |     • NewRuneBuffer — Uses a value of 0 in place of the invalid value.
-func NewRuneBuffer(size int, buff []rune) *RuneBuffer {
-	if size < 0 {
-		size = 0
-	}
-	rb := make(RuneBuffer, size)
-	copy(rb, buff)
-	return &rb
-}
-
 func (rb *RuneBuffer) Len() int {
 	return len(*rb)
 }
@@ -69,162 +45,362 @@ func (rb *RuneBuffer) String() string {
 	return sb.String()
 }
 
-func TestFifo_Len(t *testing.T) {
+func TestNew(t *testing.T) {
+	type args struct {
+		buff Buffer
+		capa int
+		mode OverflowMode
+	}
 	tests := []struct {
-		name   string
-		fifo   *State
-		expLen int
+		name      string
+		args      args
+		wantState *State
+		wantCap   int
+		wantRem   int
 	}{
 		{
-			name:   "struct-zero",
-			fifo:   &State{},
-			expLen: 0,
+			name:      "state-nil",
+			args:      args{},
+			wantState: &State{capa: 0, head: 0, tail: 0, mode: DiscardLast, buff: nil},
+			wantCap:   0,
+			wantRem:   0,
 		},
 		{
-			name:   "greater-than-cap",
-			fifo:   &State{head: 2450, tail: 2500},
-			expLen: 50,
+			name:      "buff-zero",
+			args:      args{buff: &RuneBuffer{}},
+			wantState: &State{capa: 0, head: 0, tail: 0, mode: DiscardLast, buff: &RuneBuffer{}},
+			wantCap:   0,
+			wantRem:   0,
 		},
 		{
-			name:   "uint32-overflow",
-			fifo:   &State{head: (1 << 32) - 1, tail: 0},
-			expLen: 1,
+			name:      "greater-than-phy",
+			args:      args{buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e'}, capa: 10, mode: DiscardFirst},
+			wantState: &State{capa: 5, head: 0, tail: 0, mode: DiscardFirst, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e'}},
+			wantCap:   5,
+			wantRem:   4,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if len := tt.fifo.Len(); len != tt.expLen {
-				t.Errorf("Fifo.Len() %v != %v", len, tt.expLen)
+			state := New(tt.args.buff, tt.args.capa, tt.args.mode)
+			if !reflect.DeepEqual(state, tt.wantState) {
+				t.Errorf("New(%s, %d, %s): %s != %s",
+					tt.args.buff.String(), tt.args.capa, tt.args.mode.String(), state.String(), tt.wantState.String())
+			}
+			if cap := state.Cap(); cap != tt.wantCap {
+				t.Errorf("Cap(): %d != %d", cap, tt.wantCap)
+			}
+			if rem := state.Rem(); rem != tt.wantRem {
+				t.Errorf("Rem(): %d != %d", rem, tt.wantRem)
 			}
 		})
 	}
 }
 
-func TestFifo_Deq(t *testing.T) {
+func TestState_Len(t *testing.T) {
 	tests := []struct {
 		name    string
-		fifo    *State
-		expData Data
-		expOK   bool
+		state   *State
+		wantLen int
 	}{
 		{
-			name:    "struct-nil",
-			fifo:    nil,
-			expData: nil,
-			expOK:   false,
+			name:    "state-zero",
+			state:   &State{},
+			wantLen: 0,
 		},
 		{
-			name:    "struct-zero",
-			fifo:    &State{},
-			expData: nil,
-			expOK:   false,
+			name:    "greater-than-cap",
+			state:   &State{head: 2450, tail: 2500},
+			wantLen: 50,
 		},
 		{
-			name:    "buff-nil",
-			fifo:    &State{capa: 10, head: 0, tail: 9, buff: nil},
-			expData: nil,
-			expOK:   false,
-		},
-		{
-			name:    "buff-empty",
-			fifo:    &State{capa: 10, head: 0, tail: 0, buff: NewRuneBuffer(10, []rune{})},
-			expData: nil,
-			expOK:   false,
-		},
-		{
-			name:    "buff-single",
-			fifo:    &State{capa: 10, head: 9, tail: 10, buff: NewRuneBuffer(10, []rune{z, z, z, z, z, z, z, z, z, 'X'})},
-			expData: 'X',
-			expOK:   true,
-		},
-		{
-			name:    "buff-full",
-			fifo:    &State{capa: 10, head: 12, tail: 21, buff: NewRuneBuffer(10, []rune("abcdefghij"))},
-			expData: 'c',
-			expOK:   true,
+			name:    "uint32-overflow",
+			state:   &State{head: (1 << 32) - 1, tail: 0},
+			wantLen: 1,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			q := tt.fifo
-			data, ok := q.Deq()
-			if !reflect.DeepEqual(data, tt.expData) {
-				t.Errorf("Fifo.Deq(): data: %v != %v", data, tt.expData)
-			}
-			if ok != tt.expOK {
-				t.Errorf("Fifo.Deq(): ok: %v != %v", ok, tt.expOK)
+			if len := tt.state.Len(); len != tt.wantLen {
+				t.Errorf("Fifo.Len(): %v != %v", len, tt.wantLen)
 			}
 		})
 	}
 }
 
-func TestFifo_Enq(t *testing.T) {
+func TestState_Deq(t *testing.T) {
 	tests := []struct {
-		name    string
-		fifo    *State
-		data    Data
-		expFifo *State
-		expOK   bool
+		name     string
+		state    *State
+		wantData Data
+		wantOK   bool
 	}{
 		{
-			name:    "struct-nil",
-			fifo:    nil,
-			data:    'X',
-			expFifo: nil,
-			expOK:   false,
+			name:     "state-nil",
+			state:    nil,
+			wantData: nil,
+			wantOK:   false,
 		},
 		{
-			name:    "struct-zero",
-			fifo:    &State{},
-			data:    'X',
-			expFifo: &State{},
-			expOK:   false,
+			name:     "state-zero",
+			state:    &State{},
+			wantData: nil,
+			wantOK:   false,
 		},
 		{
-			name:    "buff-nil",
-			fifo:    &State{capa: 10, mode: DiscardLast, head: 0, tail: 9, buff: nil},
-			data:    'X',
-			expFifo: &State{capa: 10, mode: DiscardLast, head: 0, tail: 9, buff: nil},
-			expOK:   false,
+			name:     "buff-nil",
+			state:    &State{capa: 10, head: 0, tail: 9, buff: nil},
+			wantData: nil,
+			wantOK:   false,
 		},
 		{
-			name:    "buff-empty",
-			fifo:    &State{capa: 10, mode: DiscardLast, head: 0, tail: 0, buff: NewRuneBuffer(10, []rune{})},
-			data:    'X',
-			expFifo: &State{capa: 10, mode: DiscardLast, head: 0, tail: 1, buff: NewRuneBuffer(10, []rune{'X'})},
-			expOK:   true,
+			name:   "buff-empty",
+			state:  &State{capa: 10, head: 0, tail: 0, buff: &RuneBuffer{}},
+			wantOK: false,
 		},
 		{
-			name:    "buff-single",
-			fifo:    &State{capa: 10, mode: DiscardLast, head: 9, tail: 10, buff: NewRuneBuffer(10, []rune{z, z, z, z, z, z, z, z, z, 'X'})},
-			data:    'X',
-			expFifo: &State{capa: 10, mode: DiscardLast, head: 9, tail: 11, buff: NewRuneBuffer(10, []rune{'X', z, z, z, z, z, z, z, z, 'X'})},
-			expOK:   true,
+			name:     "buff-single",
+			state:    &State{capa: 10, head: 9, tail: 10, buff: &RuneBuffer{z, z, z, z, z, z, z, z, z, 'X'}},
+			wantData: 'X',
+			wantOK:   true,
 		},
 		{
-			name:    "buff-full-last",
-			fifo:    &State{capa: 10, mode: DiscardLast, head: 12, tail: 21, buff: NewRuneBuffer(10, []rune("abcdefghij"))},
-			data:    'X',
-			expFifo: &State{capa: 10, mode: DiscardLast, head: 12, tail: 21, buff: NewRuneBuffer(10, []rune("abcdefghij"))},
-			expOK:   false,
-		},
-		{
-			name:    "buff-full-first",
-			fifo:    &State{capa: 10, mode: DiscardFirst, head: 12, tail: 21, buff: NewRuneBuffer(10, []rune("abcdefghij"))},
-			data:    'X',
-			expFifo: &State{capa: 10, mode: DiscardFirst, head: 13, tail: 22, buff: NewRuneBuffer(10, []rune("aXcdefghij"))},
-			expOK:   true,
+			name:     "buff-full",
+			state:    &State{capa: 10, head: 12, tail: 21, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+			wantData: 'c',
+			wantOK:   true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			q := tt.fifo
-			ok := q.Enq(tt.data)
-			if !reflect.DeepEqual(q, tt.expFifo) {
-				t.Errorf("Fifo.Enq(%v): fifo: %s != %s", tt.data, q.String(), tt.expFifo.String())
+			sc := tt.state
+			data, ok := sc.Deq()
+			if !reflect.DeepEqual(data, tt.wantData) {
+				t.Errorf("Fifo.Deq(): data: %v != %v", data, tt.wantData)
 			}
-			if ok != tt.expOK {
-				t.Errorf("Fifo.Enq(%v): ok: %v != %v", tt.data, ok, tt.expOK)
+			if ok != tt.wantOK {
+				t.Errorf("Fifo.Deq(): ok: %v != %v", ok, tt.wantOK)
+			}
+		})
+	}
+}
+
+func TestState_Enq(t *testing.T) {
+	tests := []struct {
+		name      string
+		state     *State
+		data      Data
+		wantState *State
+		wantOK    bool
+	}{
+		{
+			name:      "state-nil",
+			state:     nil,
+			data:      'X',
+			wantState: nil,
+			wantOK:    false,
+		},
+		{
+			name:      "state-zero",
+			state:     &State{},
+			data:      'X',
+			wantState: &State{},
+			wantOK:    false,
+		},
+		{
+			name:      "buff-nil",
+			state:     &State{capa: 10, mode: DiscardLast, head: 0, tail: 9, buff: nil},
+			data:      'X',
+			wantState: &State{capa: 10, mode: DiscardLast, head: 0, tail: 9, buff: nil},
+			wantOK:    false,
+		},
+		{
+			name:      "buff-empty",
+			state:     &State{capa: 5, mode: DiscardLast, head: 0, tail: 0, buff: &RuneBuffer{z, z, z, z, z}},
+			data:      'X',
+			wantState: &State{capa: 5, mode: DiscardLast, head: 0, tail: 1, buff: &RuneBuffer{'X', z, z, z, z}},
+			wantOK:    true,
+		},
+		{
+			name:      "buff-single",
+			state:     &State{capa: 10, mode: DiscardLast, head: 9, tail: 10, buff: &RuneBuffer{z, z, z, z, z, z, z, z, z, 'X'}},
+			data:      'X',
+			wantState: &State{capa: 10, mode: DiscardLast, head: 9, tail: 11, buff: &RuneBuffer{'X', z, z, z, z, z, z, z, z, 'X'}},
+			wantOK:    true,
+		},
+		{
+			name:      "buff-full-last",
+			state:     &State{capa: 10, mode: DiscardLast, head: 12, tail: 21, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+			data:      'X',
+			wantState: &State{capa: 10, mode: DiscardLast, head: 12, tail: 21, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+			wantOK:    false,
+		},
+		{
+			name:      "buff-full-first",
+			state:     &State{capa: 10, mode: DiscardFirst, head: 12, tail: 21, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+			data:      'X',
+			wantState: &State{capa: 10, mode: DiscardFirst, head: 13, tail: 22, buff: &RuneBuffer{'a', 'X', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+			wantOK:    true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sc := tt.state
+			ok := sc.Enq(tt.data)
+			if !reflect.DeepEqual(sc, tt.wantState) {
+				t.Errorf("Fifo.Enq(%v): State: %s != %s", tt.data, sc.String(), tt.wantState.String())
+			}
+			if ok != tt.wantOK {
+				t.Errorf("Fifo.Enq(%v): ok: %v != %v", tt.data, ok, tt.wantOK)
+			}
+		})
+	}
+}
+
+func TestState_Read(t *testing.T) {
+	// &State{capa: 5, mode: DiscardLast, head: 0, tail: 0, buff: &RuneBuffer{z, z, z, z, z}}
+	tests := []struct {
+		name     string
+		state    *State
+		data     []Data
+		want     int
+		wantErr  bool
+		wantData []Data
+	}{
+		{
+			name:     "state-nil",
+			state:    nil,
+			data:     make([]Data, 10),
+			want:     0,
+			wantErr:  true,
+			wantData: []Data{nil, nil, nil, nil, nil, nil, nil, nil, nil, nil},
+		},
+		{
+			name:     "buff-nil",
+			state:    &State{capa: 0, mode: DiscardLast, head: 0, tail: 0, buff: nil},
+			data:     make([]Data, 10),
+			want:     0,
+			wantErr:  true,
+			wantData: []Data{nil, nil, nil, nil, nil, nil, nil, nil, nil, nil},
+		},
+		{
+			name:     "data-nil",
+			state:    &State{capa: 5, mode: DiscardLast, head: 0, tail: 0, buff: &RuneBuffer{z, z, z, z, z}},
+			data:     nil,
+			want:     0,
+			wantErr:  true,
+			wantData: nil,
+		},
+		{
+			name:     "data-empty",
+			state:    &State{capa: 5, mode: DiscardLast, head: 0, tail: 1, buff: &RuneBuffer{'X', z, z, z, z}},
+			data:     []Data{},
+			want:     0,
+			wantErr:  true,
+			wantData: []Data{},
+		},
+		{
+			name:     "buff-empty",
+			state:    &State{capa: 5, mode: DiscardLast, head: 0, tail: 0, buff: &RuneBuffer{z, z, z, z, z}},
+			data:     make([]Data, 10),
+			want:     0,
+			wantErr:  true,
+			wantData: []Data{nil, nil, nil, nil, nil, nil, nil, nil, nil, nil},
+		},
+		{
+			name:     "buff-short",
+			state:    &State{capa: 5, mode: DiscardLast, head: 8, tail: 10, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e'}},
+			data:     make([]Data, 10),
+			want:     2,
+			wantErr:  false,
+			wantData: []Data{'d', 'e', nil, nil, nil, nil, nil, nil, nil, nil},
+		},
+		{
+			name:     "data-short",
+			state:    &State{capa: 5, mode: DiscardLast, head: 6, tail: 10, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e'}},
+			data:     make([]Data, 2),
+			want:     2,
+			wantErr:  false,
+			wantData: []Data{'b', 'c'},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.state.Read(tt.data)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("State.Read(): error: %v (want-error: %v)", err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("State.Read(): int: %d != %d", got, tt.want)
+			}
+			if !reflect.DeepEqual(tt.data, tt.wantData) {
+				t.Errorf("State.Read(): data: %+v != %+v", tt.data, tt.wantData)
+			}
+		})
+	}
+}
+
+func TestState_Write(t *testing.T) {
+	tests := []struct {
+		name      string
+		state     *State
+		data      []Data
+		want      int
+		wantErr   bool
+		wantState *State
+	}{
+		{
+			name:      "state-nil",
+			state:     nil,
+			data:      []Data{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'},
+			want:      0,
+			wantErr:   true,
+			wantState: nil,
+		},
+		{
+			name:      "buff-nil",
+			state:     &State{capa: 0, mode: DiscardLast, head: 0, tail: 0, buff: nil},
+			data:      []Data{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'},
+			want:      0,
+			wantErr:   true,
+			wantState: &State{capa: 0, mode: DiscardLast, head: 0, tail: 0, buff: nil},
+		},
+		{
+			name:      "data-nil",
+			state:     &State{capa: 5, mode: DiscardLast, head: 0, tail: 0, buff: &RuneBuffer{z, z, z, z, z}},
+			data:      nil,
+			want:      0,
+			wantErr:   true,
+			wantState: &State{capa: 5, mode: DiscardLast, head: 0, tail: 0, buff: &RuneBuffer{z, z, z, z, z}},
+		},
+		{
+			name:      "data-empty",
+			state:     &State{capa: 5, mode: DiscardLast, head: 0, tail: 0, buff: &RuneBuffer{z, z, z, z, z}},
+			data:      []Data{},
+			want:      0,
+			wantErr:   true,
+			wantState: &State{capa: 5, mode: DiscardLast, head: 0, tail: 0, buff: &RuneBuffer{z, z, z, z, z}},
+		},
+		{
+			name:      "last-zero-cap",
+			state:     &State{capa: 0, mode: DiscardLast, head: 0, tail: 0, buff: &RuneBuffer{z, z, z, z, z}},
+			data:      make([]Data, 10),
+			want:      0,
+			wantErr:   true,
+			wantState: &State{capa: 0, mode: DiscardLast, head: 0, tail: 0, buff: &RuneBuffer{z, z, z, z, z}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.state.Write(tt.data)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("State.Write(): error: %v (want-error: %v)", err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("State.Write(): int: %d != %d", got, tt.want)
+			}
+			if !reflect.DeepEqual(tt.state, tt.wantState) {
+				t.Errorf("State.Write(): State: %s != %s", tt.state.String(), tt.wantState.String())
 			}
 		})
 	}
