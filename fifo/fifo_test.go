@@ -45,6 +45,37 @@ func (rb *RuneBuffer) String() string {
 	return sb.String()
 }
 
+func TestOverflowMode_String(t *testing.T) {
+	tests := []struct {
+		name string
+		m    OverflowMode
+		want string
+	}{
+		{
+			name: "discard-last",
+			m:    DiscardLast,
+			want: "OverflowMode(DiscardLast)",
+		},
+		{
+			name: "discard-first",
+			m:    DiscardFirst,
+			want: "OverflowMode(DiscardFirst)",
+		},
+		{
+			name: "mode-invalid",
+			m:    OverflowMode(^byte(0)),
+			want: "<OverflowMode(0xFF):invalid>",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.m.String(); got != tt.want {
+				t.Errorf("OverflowMode.String(): got:%q != want:%q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestNew(t *testing.T) {
 	type args struct {
 		buff Buffer
@@ -84,14 +115,50 @@ func TestNew(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			state := New(tt.args.buff, tt.args.capa, tt.args.mode)
 			if !reflect.DeepEqual(state, tt.wantState) {
-				t.Errorf("New(%s, %d, %s): %s != %s",
+				t.Errorf("New(%s, %d, %s): got:%s != want:%s",
 					tt.args.buff.String(), tt.args.capa, tt.args.mode.String(), state.String(), tt.wantState.String())
 			}
 			if cap := state.Cap(); cap != tt.wantCap {
-				t.Errorf("Cap(): %d != %d", cap, tt.wantCap)
+				t.Errorf("Cap(): got:%d != want:%d", cap, tt.wantCap)
 			}
 			if rem := state.Rem(); rem != tt.wantRem {
-				t.Errorf("Rem(): %d != %d", rem, tt.wantRem)
+				t.Errorf("Rem(): got:%d != want:%d", rem, tt.wantRem)
+			}
+		})
+	}
+}
+
+func TestState_String(t *testing.T) {
+	tests := []struct {
+		name  string
+		state *State
+		want  string
+	}{
+		{
+			name:  "basic",
+			state: &State{capa: 5, mode: DiscardLast, head: 1, tail: 4, buff: &RuneBuffer{z, 'a', 'b', 'c', z}},
+			want:  "{mode:OverflowMode(DiscardLast), capa:5, head:1[1], tail:4[4], size:3, buff:[.abc.]}",
+		},
+		{
+			name:  "state-nil",
+			state: nil,
+			want:  "<nil>",
+		},
+		{
+			name:  "buff-nil",
+			state: &State{capa: 0, mode: DiscardLast, head: 0, tail: 0, buff: nil},
+			want:  "{mode:OverflowMode(DiscardLast), capa:0, head:0[0], tail:0[0], size:0, buff:<nil>}",
+		},
+		{
+			name:  "buff-zero",
+			state: &State{buff: &RuneBuffer{}},
+			want:  "{mode:OverflowMode(DiscardLast), capa:0, head:0[0], tail:0[0], size:0, buff:[]}",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.state.String(); got != tt.want {
+				t.Errorf("State.String(): got:%q != want:%q", got, tt.want)
 			}
 		})
 	}
@@ -122,7 +189,7 @@ func TestState_Len(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if len := tt.state.Len(); len != tt.wantLen {
-				t.Errorf("Fifo.Len(): %v != %v", len, tt.wantLen)
+				t.Errorf("Fifo.Len(): got:%v != want:%v", len, tt.wantLen)
 			}
 		})
 	}
@@ -176,10 +243,10 @@ func TestState_Deq(t *testing.T) {
 			sc := tt.state
 			data, ok := sc.Deq()
 			if !reflect.DeepEqual(data, tt.wantData) {
-				t.Errorf("Fifo.Deq(): data: %v != %v", data, tt.wantData)
+				t.Errorf("Fifo.Deq(): data: got:%+v != want:%+v", data, tt.wantData)
 			}
 			if ok != tt.wantOK {
-				t.Errorf("Fifo.Deq(): ok: %v != %v", ok, tt.wantOK)
+				t.Errorf("Fifo.Deq(): ok: got:%v != want:%v", ok, tt.wantOK)
 			}
 		})
 	}
@@ -229,14 +296,14 @@ func TestState_Enq(t *testing.T) {
 			wantOK:    true,
 		},
 		{
-			name:      "buff-full-last",
+			name:      "discard-last",
 			state:     &State{capa: 10, mode: DiscardLast, head: 12, tail: 21, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
 			data:      'X',
 			wantState: &State{capa: 10, mode: DiscardLast, head: 12, tail: 21, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
 			wantOK:    false,
 		},
 		{
-			name:      "buff-full-first",
+			name:      "discard-first",
 			state:     &State{capa: 10, mode: DiscardFirst, head: 12, tail: 21, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
 			data:      'X',
 			wantState: &State{capa: 10, mode: DiscardFirst, head: 13, tail: 22, buff: &RuneBuffer{'a', 'X', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
@@ -248,10 +315,10 @@ func TestState_Enq(t *testing.T) {
 			sc := tt.state
 			ok := sc.Enq(tt.data)
 			if !reflect.DeepEqual(sc, tt.wantState) {
-				t.Errorf("Fifo.Enq(%v): State: %s != %s", tt.data, sc.String(), tt.wantState.String())
+				t.Errorf("Fifo.Enq(%+v): State: got:%s != want:%s", tt.data, sc.String(), tt.wantState.String())
 			}
 			if ok != tt.wantOK {
-				t.Errorf("Fifo.Enq(%v): ok: %v != %v", tt.data, ok, tt.wantOK)
+				t.Errorf("Fifo.Enq(%+v): ok: got:%v != want:%v", tt.data, ok, tt.wantOK)
 			}
 		})
 	}
@@ -331,10 +398,10 @@ func TestState_Read(t *testing.T) {
 				t.Errorf("State.Read(): error: %v (want-error: %v)", err, tt.wantErr)
 			}
 			if got != tt.want {
-				t.Errorf("State.Read(): int: %d != %d", got, tt.want)
+				t.Errorf("State.Read(): int: got:%d != want:%d", got, tt.want)
 			}
 			if !reflect.DeepEqual(tt.data, tt.wantData) {
-				t.Errorf("State.Read(): data: %+v != %+v", tt.data, tt.wantData)
+				t.Errorf("State.Read(): data: got:%+v != want:%+v", tt.data, tt.wantData)
 			}
 		})
 	}
@@ -382,6 +449,54 @@ func TestState_Write(t *testing.T) {
 			wantState: &State{capa: 5, mode: DiscardLast, head: 0, tail: 0, buff: &RuneBuffer{z, z, z, z, z}},
 		},
 		{
+			name:      "zero-cap",
+			state:     &State{capa: 0, mode: DiscardLast, head: 0, tail: 0, buff: &RuneBuffer{z, z, z, z, z}},
+			data:      []Data{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'},
+			want:      0,
+			wantErr:   true,
+			wantState: &State{capa: 0, mode: DiscardLast, head: 0, tail: 0, buff: &RuneBuffer{z, z, z, z, z}},
+		},
+		{
+			name:      "mode-invalid",
+			state:     &State{capa: 5, mode: OverflowMode(^byte(0)), head: 0, tail: 0, buff: &RuneBuffer{z, z, z, z, z}},
+			data:      []Data{'a'},
+			want:      0,
+			wantErr:   true,
+			wantState: &State{capa: 5, mode: OverflowMode(^byte(0)), head: 0, tail: 0, buff: &RuneBuffer{z, z, z, z, z}},
+		},
+		{
+			name:      "discard-last",
+			state:     &State{capa: 5, mode: DiscardLast, head: 2, tail: 6, buff: &RuneBuffer{'d', z, 'a', 'b', 'c'}},
+			data:      []Data{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'},
+			want:      0,
+			wantErr:   true,
+			wantState: &State{capa: 5, mode: DiscardLast, head: 2, tail: 6, buff: &RuneBuffer{'d', z, 'a', 'b', 'c'}},
+		},
+		{
+			name:      "short-write",
+			state:     &State{capa: 10, mode: DiscardLast, head: 0, tail: 7, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', z, z, z}},
+			data:      []Data{'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'},
+			want:      2,
+			wantErr:   false,
+			wantState: &State{capa: 10, mode: DiscardLast, head: 0, tail: 9, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'q', 'r', z}},
+		},
+		{
+			name:      "discard-first",
+			state:     &State{capa: 5, mode: DiscardFirst, head: 2, tail: 6, buff: &RuneBuffer{'d', z, 'a', 'b', 'c'}},
+			data:      []Data{'q', 'r', 's'},
+			want:      3,
+			wantErr:   false,
+			wantState: &State{capa: 5, mode: DiscardFirst, head: 5, tail: 9, buff: &RuneBuffer{'d', 'q', 'r', 's', 'c'}},
+		},
+		{
+			name:      "discard-cap",
+			state:     &State{capa: 5, mode: DiscardFirst, head: 2, tail: 6, buff: &RuneBuffer{'d', z, 'a', 'b', 'c'}},
+			data:      []Data{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'},
+			want:      10,
+			wantErr:   false,
+			wantState: &State{capa: 5, mode: DiscardFirst, head: 0, tail: 4, buff: &RuneBuffer{'g', 'h', 'i', 'j', 'c'}},
+		},
+		{
 			name:      "last-zero-cap",
 			state:     &State{capa: 0, mode: DiscardLast, head: 0, tail: 0, buff: &RuneBuffer{z, z, z, z, z}},
 			data:      make([]Data, 10),
@@ -397,10 +512,10 @@ func TestState_Write(t *testing.T) {
 				t.Errorf("State.Write(): error: %v (want-error: %v)", err, tt.wantErr)
 			}
 			if got != tt.want {
-				t.Errorf("State.Write(): int: %d != %d", got, tt.want)
+				t.Errorf("State.Write(): int: got:%d != want:%d", got, tt.want)
 			}
 			if !reflect.DeepEqual(tt.state, tt.wantState) {
-				t.Errorf("State.Write(): State: %s != %s", tt.state.String(), tt.wantState.String())
+				t.Errorf("State.Write(): State: got:%s != want:%s", tt.state.String(), tt.wantState.String())
 			}
 		})
 	}

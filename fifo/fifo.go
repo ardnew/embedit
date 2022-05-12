@@ -33,11 +33,12 @@ const (
 func (m OverflowMode) String() string {
 	switch m {
 	case DiscardLast:
-		return "discard-last"
+		return "OverflowMode(DiscardLast)"
 	case DiscardFirst:
-		return "discard-first"
+		return "OverflowMode(DiscardFirst)"
 	}
-	return ""
+	s := strings.ToUpper(strconv.FormatUint(uint64(m), 16))
+	return "<OverflowMode(0x" + s + "):invalid>"
 }
 
 // Data defines the interface for elements of a FIFO, enabling any arbitrary,
@@ -261,18 +262,16 @@ func (s *State) Write(data []Data) (int, error) {
 	case DiscardFirst: // Drop outgoing data
 		// Trying to write more data than the FIFO will hold will simply overwrite
 		// some of the given data, so there is no point writing that data.
-		from := 0
+		span, from := more, 0
 		if more >= int(s.capa.Get()) {
-			// Begin copying only the data that will be kept.
-			from = more - int(s.capa.Get()) + 1
-			// We can fill the entire FIFO.
-			more = int(s.capa.Get())
 			// Reset the indices.
 			s.head.Set(0)
 			s.tail.Set(0)
+			// Begin copying only the data that will be kept.
+			from = more - int(s.capa.Get()) + 1
+			// We can fill the entire FIFO.
+			more = s.Rem()
 		}
-		// tail := s.tail.Get()
-		// used := tail - s.head.Get()
 		// Make space for incoming data by discarding only as many FIFO elements as
 		// is necessary to store incoming data.
 		if more > s.Rem() {
@@ -287,7 +286,7 @@ func (s *State) Write(data []Data) (int, error) {
 			}
 		}
 		s.tail.Set(tail)
-		return int(more), nil
+		return span, nil
 	}
 	return 0, ErrDiscardMode
 }
@@ -419,8 +418,12 @@ func (s *State) String() string {
 	sb.WriteString("capa:" + strconv.FormatUint(uint64(s.capa.Get()), 10) + ", ")
 	sb.WriteString("head:" + strconv.FormatUint(uint64(s.head.Get()), 10) + "[" + strconv.FormatUint(uint64(s.head.Get()), 10) + "], ")
 	sb.WriteString("tail:" + strconv.FormatUint(uint64(s.tail.Get()), 10) + "[" + strconv.FormatUint(uint64(s.tail.Get()), 10) + "], ")
-	sb.WriteString("size:" + strconv.FormatUint(uint64(s.Len()), 10) + "], ")
-	sb.WriteString("buff:" + s.buff.String())
+	sb.WriteString("size:" + strconv.FormatUint(uint64(s.Len()), 10) + ", ")
+	if s.buff == nil {
+		sb.WriteString("buff:<nil>")
+	} else {
+		sb.WriteString("buff:" + s.buff.String())
+	}
 	sb.WriteRune('}')
 	return sb.String()
 }
