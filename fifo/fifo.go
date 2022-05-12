@@ -416,8 +416,16 @@ func (s *State) String() string {
 	sb.WriteRune('{')
 	sb.WriteString("mode:" + s.mode.String() + ", ")
 	sb.WriteString("capa:" + strconv.FormatUint(uint64(s.capa.Get()), 10) + ", ")
-	sb.WriteString("head:" + strconv.FormatUint(uint64(s.head.Get()), 10) + "[" + strconv.FormatUint(uint64(s.head.Get()), 10) + "], ")
-	sb.WriteString("tail:" + strconv.FormatUint(uint64(s.tail.Get()), 10) + "[" + strconv.FormatUint(uint64(s.tail.Get()), 10) + "], ")
+	sb.WriteString("head:" + strconv.FormatUint(uint64(s.head.Get()), 10))
+	if s.capa.Get() != 0 && s.head.Get() >= s.capa.Get() {
+		sb.WriteString("[" + strconv.FormatUint(uint64(s.head.Get()%s.capa.Get()), 10) + "]")
+	}
+	sb.WriteString(", ")
+	sb.WriteString("tail:" + strconv.FormatUint(uint64(s.tail.Get()), 10))
+	if s.capa.Get() != 0 && s.tail.Get() >= s.capa.Get() {
+		sb.WriteString("[" + strconv.FormatUint(uint64(s.tail.Get()%s.capa.Get()), 10) + "]")
+	}
+	sb.WriteString(", ")
 	sb.WriteString("size:" + strconv.FormatUint(uint64(s.Len()), 10) + ", ")
 	if s.buff == nil {
 		sb.WriteString("buff:<nil>")

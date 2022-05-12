@@ -136,8 +136,8 @@ func TestState_String(t *testing.T) {
 	}{
 		{
 			name:  "basic",
-			state: &State{capa: 5, mode: DiscardLast, head: 1, tail: 4, buff: &RuneBuffer{z, 'a', 'b', 'c', z}},
-			want:  "{mode:OverflowMode(DiscardLast), capa:5, head:1[1], tail:4[4], size:3, buff:[.abc.]}",
+			state: &State{capa: 5, mode: DiscardLast, head: 3, tail: 6, buff: &RuneBuffer{z, 'a', 'b', 'c', z}},
+			want:  "{mode:OverflowMode(DiscardLast), capa:5, head:3, tail:6[1], size:3, buff:[.abc.]}",
 		},
 		{
 			name:  "state-nil",
@@ -146,13 +146,13 @@ func TestState_String(t *testing.T) {
 		},
 		{
 			name:  "buff-nil",
-			state: &State{capa: 0, mode: DiscardLast, head: 0, tail: 0, buff: nil},
-			want:  "{mode:OverflowMode(DiscardLast), capa:0, head:0[0], tail:0[0], size:0, buff:<nil>}",
+			state: &State{capa: 2, mode: DiscardLast, head: 5, tail: 100, buff: nil},
+			want:  "{mode:OverflowMode(DiscardLast), capa:2, head:5[1], tail:100[0], size:95, buff:<nil>}",
 		},
 		{
 			name:  "buff-zero",
 			state: &State{buff: &RuneBuffer{}},
-			want:  "{mode:OverflowMode(DiscardLast), capa:0, head:0[0], tail:0[0], size:0, buff:[]}",
+			want:  "{mode:OverflowMode(DiscardLast), capa:0, head:0, tail:0, size:0, buff:[]}",
 		},
 	}
 	for _, tt := range tests {
