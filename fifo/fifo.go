@@ -4,20 +4,9 @@ import (
 	"errors"
 	"strconv"
 	"strings"
-	//"runtime/volatile"
+
+	"github.com/ardnew/embedit/volatile"
 )
-
-// R defines a type with the same interface as one of the RegisterN types from
-// package "runtime/volatile" of TinyGo.
-// It may be substituted in place of the RegisterN type for testing FIFO logic
-// on a regular PC with standard Go, which does not provide "runtime/volatile".
-type R uint32
-
-// Set sets the value of the receiver r to the given uint32 v.
-func (r *R) Set(v uint32) { *r = R(v) }
-
-// Get returns the value of the receiver r as a uint32.
-func (r *R) Get() uint32 { return uint32(*r) }
 
 // OverflowMode enumerates the options for handling data enqueued to a
 // FIFO that is filled to capacity.
@@ -61,9 +50,9 @@ type Buffer interface {
 // Buffer interface.
 type State struct {
 	buff Buffer
-	capa R
-	head R
-	tail R
+	capa volatile.Register32
+	head volatile.Register32
+	tail volatile.Register32
 	mode OverflowMode
 }
 
@@ -291,15 +280,13 @@ func (s *State) Write(data []Data) (int, error) {
 	return 0, ErrDiscardMode
 }
 
-// First returns the next element that would be dequeued from the receiver FIFO
-// and true.
-// If the FIFO is empty and no element would be dequeued, returns nil and false.
-func (s *State) First() (Data, bool) { return s.Get(0) }
+// First returns the next element that would be dequeued from the receiver FIFO.
+// If no element would be dequeued, returns nil.
+func (s *State) First() Data { data, _ := s.Get(0); return data }
 
-// Last returns the last element that would be dequeued from the receiver FIFO
-// and true.
-// If the FIFO is empty and no element would be dequeued, returns nil and false.
-func (s *State) Last() (Data, bool) { return s.Get(-1) }
+// Last returns the last element that would be dequeued from the receiver FIFO.
+// If no element would be dequeued, returns nil.
+func (s *State) Last() Data { data, _ := s.Get(-1); return data }
 
 // index returns an index into the receiver FIFO based on sign/magnitude of i.
 //
@@ -325,34 +312,45 @@ func (s *State) index(i int) (int, bool) {
 	return 0, false
 }
 
-// Get returns the value of an element in the receiver FIFO, offset by i from the
-// front of the queue if i is positive, or from the back of the queue if i is
-// negative. For example:
+// Get returns the value of an element in the receiver FIFO, offset by i from
+// the front of the queue if i is positive, or from the back of the queue if i
+// is negative. For example:
 //
 //	Get(0)  == Get(-Len())  == First(), and
 //	Get(-1) == Get(Len()-1) == Last().
 //
-// If the offset is beyond queue boundaries, returns 0 and false.
+// If the offset is beyond queue boundaries, returns nil and false.
 func (s *State) Get(i int) (Data, bool) {
-	if n, ok := s.index(i); ok {
-		return s.buff.Get(n)
+	if s == nil || s.buff == nil {
+		return nil, false
 	}
-	return nil, false
+	n, ok := s.index(i)
+	if !ok {
+		return nil, false
+	}
+	return s.buff.Get(n)
 }
 
 // Set modifies the value of an element in the receiver FIFO.
 // Set uses the same logic as Get to select an element in the FIFO.
 func (s *State) Set(i int, data Data) bool {
-	if n, ok := s.index(i); ok {
-		return s.buff.Set(n, data)
+	if s == nil || s.buff == nil {
+		return false
 	}
-	return false
+	n, ok := s.index(i)
+	if !ok {
+		return false
+	}
+	return s.buff.Set(n, data)
 }
 
 // Remove removes and returns the value of an element from the receiver FIFO,
 // moving all trailing elements forward in queue. Reduces FIFO length by 1.
 // Remove uses the same logic as Get to select an element in the FIFO.
 func (s *State) Remove(i int) (Data, bool) {
+	if s == nil || s.buff == nil {
+		return nil, false
+	}
 	head := s.head.Get()
 	tail := s.tail.Get()
 	if head == tail {
