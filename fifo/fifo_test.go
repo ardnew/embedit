@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/ardnew/embedit/volatile"
 )
 
 type RuneBuffer []rune
@@ -122,7 +124,7 @@ func TestNew(t *testing.T) {
 			out{
 				State: &State{capa: 5, head: 0, tail: 0, mode: DiscardFirst, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e'}},
 				cap:   5,
-				rem:   4,
+				rem:   5,
 			},
 		},
 	} {
@@ -135,6 +137,10 @@ func TestNew(t *testing.T) {
 			}
 			if cap := state.Cap(); cap != tt.out.cap {
 				t.Errorf("Cap(): int: got:%d != want:%d", cap, tt.out.cap)
+			}
+			if cap := (&State{buff: tt.in.Buffer, capa: volatile.Register32(tt.in.int)}).Cap(); cap != tt.out.cap {
+				t.Errorf("(&State{buff:%s, capa:%d}).Cap(): int: got:%d != want:%d",
+					tt.in.Buffer.String(), tt.in.int, cap, tt.out.cap)
 			}
 			if rem := state.Rem(); rem != tt.out.rem {
 				t.Errorf("Rem(): int: got:%d != want:%d", rem, tt.out.rem)
@@ -250,7 +256,7 @@ func TestState_Deq(t *testing.T) {
 			out{'X', true},
 		}, {
 			"buff-full",
-			in{&State{capa: 10, head: 12, tail: 21, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}}},
+			in{&State{capa: 10, head: 12, tail: 22, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}}},
 			out{'c', true},
 		},
 	} {
@@ -302,12 +308,12 @@ func TestState_Enq(t *testing.T) {
 			out{&State{capa: 10, mode: DiscardLast, head: 9, tail: 11, buff: &RuneBuffer{'X', z, z, z, z, z, z, z, z, 'X'}}, true},
 		}, {
 			"discard-last",
-			in{&State{capa: 10, mode: DiscardLast, head: 12, tail: 21, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}}, 'X'},
-			out{&State{capa: 10, mode: DiscardLast, head: 12, tail: 21, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}}, false},
+			in{&State{capa: 10, mode: DiscardLast, head: 12, tail: 22, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}}, 'X'},
+			out{&State{capa: 10, mode: DiscardLast, head: 12, tail: 22, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}}, false},
 		}, {
 			"discard-first",
-			in{&State{capa: 10, mode: DiscardFirst, head: 12, tail: 21, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}}, 'X'},
-			out{&State{capa: 10, mode: DiscardFirst, head: 13, tail: 22, buff: &RuneBuffer{'a', 'X', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}}, true},
+			in{&State{capa: 10, mode: DiscardFirst, head: 12, tail: 22, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}}, 'X'},
+			out{&State{capa: 10, mode: DiscardFirst, head: 13, tail: 23, buff: &RuneBuffer{'a', 'b', 'X', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}}, true},
 		},
 	} {
 		t.Run(tt.string, func(t *testing.T) {
@@ -442,31 +448,31 @@ func TestState_Write(t *testing.T) {
 		}, {
 			"discard-last",
 			in{
-				&State{capa: 5, mode: DiscardLast, head: 2, tail: 6, buff: &RuneBuffer{'d', z, 'a', 'b', 'c'}},
-				[]Data{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'},
+				&State{capa: 5, mode: DiscardLast, head: 2, tail: 7, buff: &RuneBuffer{'d', 'e', 'a', 'b', 'c'}},
+				[]Data{'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'},
 			},
-			out{0, true, &State{capa: 5, mode: DiscardLast, head: 2, tail: 6, buff: &RuneBuffer{'d', z, 'a', 'b', 'c'}}},
+			out{0, true, &State{capa: 5, mode: DiscardLast, head: 2, tail: 7, buff: &RuneBuffer{'d', 'e', 'a', 'b', 'c'}}},
 		}, {
 			"short-write",
 			in{
 				&State{capa: 10, mode: DiscardLast, head: 0, tail: 7, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', z, z, z}},
 				[]Data{'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'},
 			},
-			out{2, false, &State{capa: 10, mode: DiscardLast, head: 0, tail: 9, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'q', 'r', z}}},
+			out{3, false, &State{capa: 10, mode: DiscardLast, head: 0, tail: 10, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'q', 'r', 's'}}},
 		}, {
 			"discard-first",
 			in{
-				&State{capa: 5, mode: DiscardFirst, head: 2, tail: 6, buff: &RuneBuffer{'d', z, 'a', 'b', 'c'}},
+				&State{capa: 5, mode: DiscardFirst, head: 2, tail: 7, buff: &RuneBuffer{'d', 'e', 'a', 'b', 'c'}},
 				[]Data{'q', 'r', 's'},
 			},
-			out{3, false, &State{capa: 5, mode: DiscardFirst, head: 5, tail: 9, buff: &RuneBuffer{'d', 'q', 'r', 's', 'c'}}},
+			out{3, false, &State{capa: 5, mode: DiscardFirst, head: 5, tail: 10, buff: &RuneBuffer{'d', 'e', 'q', 'r', 's'}}},
 		}, {
 			"discard-cap",
 			in{
-				&State{capa: 5, mode: DiscardFirst, head: 2, tail: 6, buff: &RuneBuffer{'d', z, 'a', 'b', 'c'}},
+				&State{capa: 5, mode: DiscardFirst, head: 2, tail: 7, buff: &RuneBuffer{'d', 'e', 'a', 'b', 'c'}},
 				[]Data{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'},
 			},
-			out{10, false, &State{capa: 5, mode: DiscardFirst, head: 0, tail: 4, buff: &RuneBuffer{'g', 'h', 'i', 'j', 'c'}}},
+			out{10, false, &State{capa: 5, mode: DiscardFirst, head: 0, tail: 5, buff: &RuneBuffer{'f', 'g', 'h', 'i', 'j'}}},
 		}, {
 			"last-zero-cap",
 			in{
@@ -621,32 +627,34 @@ func TestState_Set(t *testing.T) {
 			"[4]FIFO:",
 			in{
 				&State{capa: 10, mode: DiscardFirst, head: 2, tail: 6, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
-				[]int{0, 3, 1, 4},
-				[]Data{'x', 'y', nil, nil},
+				[]int{0, 3, 1, 4, 4},
+				[]Data{'x', 'y', nil, nil, 'z'},
 			},
 			out{
-				[]bool{true, true, false, false},
+				[]bool{true, true, false, false, false},
 				[]*State{
 					{capa: 10, mode: DiscardFirst, head: 2, tail: 6, buff: &RuneBuffer{'a', 'b', 'x', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+					{capa: 10, mode: DiscardFirst, head: 2, tail: 6, buff: &RuneBuffer{'a', 'b', 'x', 'd', 'e', 'y', 'g', 'h', 'i', 'j'}},
 					{capa: 10, mode: DiscardFirst, head: 2, tail: 6, buff: &RuneBuffer{'a', 'b', 'x', 'd', 'e', 'y', 'g', 'h', 'i', 'j'}},
 					{capa: 10, mode: DiscardFirst, head: 2, tail: 6, buff: &RuneBuffer{'a', 'b', 'x', 'd', 'e', 'y', 'g', 'h', 'i', 'j'}},
 					{capa: 10, mode: DiscardFirst, head: 2, tail: 6, buff: &RuneBuffer{'a', 'b', 'x', 'd', 'e', 'y', 'g', 'h', 'i', 'j'}},
 				},
 			},
 		}, {
-			"[5]FIFO:",
+			"[10]FIFO:",
 			in{
-				&State{capa: 10, mode: DiscardFirst, head: 2, tail: 7, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
-				[]int{-1, -5, -2, -6},
-				[]Data{'x', 'y', nil, nil},
+				&State{capa: 10, mode: DiscardFirst, head: 2, tail: 12, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+				[]int{-1, -10, -2, -11},
+				[]Data{'x', 'y', nil, nil, 'z'},
 			},
 			out{
-				[]bool{true, true, false, false},
+				[]bool{true, true, false, false, false},
 				[]*State{
-					{capa: 10, mode: DiscardFirst, head: 2, tail: 7, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'x', 'h', 'i', 'j'}},
-					{capa: 10, mode: DiscardFirst, head: 2, tail: 7, buff: &RuneBuffer{'a', 'b', 'y', 'd', 'e', 'f', 'x', 'h', 'i', 'j'}},
-					{capa: 10, mode: DiscardFirst, head: 2, tail: 7, buff: &RuneBuffer{'a', 'b', 'y', 'd', 'e', 'f', 'x', 'h', 'i', 'j'}},
-					{capa: 10, mode: DiscardFirst, head: 2, tail: 7, buff: &RuneBuffer{'a', 'b', 'y', 'd', 'e', 'f', 'x', 'h', 'i', 'j'}},
+					{capa: 10, mode: DiscardFirst, head: 2, tail: 12, buff: &RuneBuffer{'a', 'x', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+					{capa: 10, mode: DiscardFirst, head: 2, tail: 12, buff: &RuneBuffer{'a', 'x', 'y', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+					{capa: 10, mode: DiscardFirst, head: 2, tail: 12, buff: &RuneBuffer{'a', 'x', 'y', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+					{capa: 10, mode: DiscardFirst, head: 2, tail: 12, buff: &RuneBuffer{'a', 'x', 'y', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+					{capa: 10, mode: DiscardFirst, head: 2, tail: 12, buff: &RuneBuffer{'a', 'x', 'y', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
 				},
 			},
 		},
@@ -667,6 +675,9 @@ func TestState_Set(t *testing.T) {
 			string := strconv.FormatInt(int64(tt.in.int[i]), 10)
 			if tt.in.int[i] >= 0 {
 				string = "+" + string
+			}
+			if tt.in.Data[i] == nil {
+				string += "<nil>"
 			}
 			t.Run(tt.string+string, func(t *testing.T) {
 				bool := tt.in.State.Set(tt.in.int[i], tt.in.Data[i])
@@ -820,6 +831,79 @@ func TestState_Remove(t *testing.T) {
 			}
 			if bool != tt.out.bool {
 				t.Errorf("State.Remove(%d): bool: got:%v != want:%v", tt.in.int, bool, tt.out.bool)
+			}
+		})
+	}
+}
+
+func TestState_Insert(t *testing.T) {
+	type in struct {
+		*State
+		int
+		Data
+	}
+	type out struct {
+		*State
+		bool
+	}
+	for _, tt := range []struct {
+		string
+		in
+		out
+	}{
+		{
+			"state-nil",
+			in{nil, 0, 'X'},
+			out{nil, false},
+		}, {
+			"buff-nil",
+			in{&State{capa: 0, mode: DiscardLast, head: 0, tail: 0, buff: nil}, 0, 'X'},
+			out{&State{capa: 0, mode: DiscardLast, head: 0, tail: 0, buff: nil}, false},
+		}, {
+			"data-nil",
+			in{&State{capa: 5, mode: DiscardLast, head: 0, tail: 1, buff: &RuneBuffer{'a', z, z, z, z}}, 0, nil},
+			out{&State{capa: 5, mode: DiscardLast, head: 0, tail: 1, buff: &RuneBuffer{'a', 'a', z, z, z}}, false},
+		}, {
+			"zero-cap",
+			in{&State{capa: 0, mode: DiscardLast, head: 0, tail: 0, buff: &RuneBuffer{z, z, z, z, z}}, 0, 'X'},
+			out{&State{capa: 0, mode: DiscardLast, head: 0, tail: 0, buff: &RuneBuffer{z, z, z, z, z}}, false},
+		}, {
+			"zero-len",
+			in{&State{capa: 5, mode: DiscardLast, head: 0, tail: 0, buff: &RuneBuffer{z, z, z, z, z}}, 0, 'X'},
+			out{&State{capa: 5, mode: DiscardLast, head: 0, tail: 0, buff: &RuneBuffer{z, z, z, z, z}}, false},
+		}, {
+			"head-last",
+			in{&State{capa: 5, mode: DiscardLast, head: 2, tail: 7, buff: &RuneBuffer{'d', 'e', 'a', 'b', 'c'}}, 0, 'X'},
+			out{&State{capa: 5, mode: DiscardLast, head: 2, tail: 7, buff: &RuneBuffer{'c', 'd', 'X', 'a', 'b'}}, true},
+		}, {
+			"head-first",
+			in{&State{capa: 5, mode: DiscardFirst, head: 2, tail: 7, buff: &RuneBuffer{'d', 'e', 'a', 'b', 'c'}}, 0, 'X'},
+			out{&State{capa: 5, mode: DiscardFirst, head: 3, tail: 8, buff: &RuneBuffer{'c', 'd', 'e', 'X', 'b'}}, true},
+		}, {
+			"tail-last",
+			in{&State{capa: 5, mode: DiscardLast, head: 2, tail: 7, buff: &RuneBuffer{'d', 'e', 'a', 'b', 'c'}}, 4, 'X'},
+			out{&State{capa: 5, mode: DiscardLast, head: 2, tail: 7, buff: &RuneBuffer{'d', 'X', 'a', 'b', 'c'}}, true},
+		}, {
+			"tail-first",
+			in{&State{capa: 5, mode: DiscardFirst, head: 2, tail: 7, buff: &RuneBuffer{'d', 'e', 'a', 'b', 'c'}}, 4, 'X'},
+			out{&State{capa: 5, mode: DiscardFirst, head: 3, tail: 8, buff: &RuneBuffer{'d', 'e', 'X', 'b', 'c'}}, true},
+		}, {
+			"mid-last",
+			in{&State{capa: 5, mode: DiscardLast, head: 2, tail: 5, buff: &RuneBuffer{z, z, 'a', 'b', 'c'}}, 1, 'X'},
+			out{&State{capa: 5, mode: DiscardLast, head: 2, tail: 6, buff: &RuneBuffer{'c', z, 'a', 'X', 'b'}}, true},
+		}, {
+			"mid-first",
+			in{&State{capa: 5, mode: DiscardFirst, head: 2, tail: 5, buff: &RuneBuffer{z, z, 'a', 'b', 'c'}}, 1, 'X'},
+			out{&State{capa: 5, mode: DiscardFirst, head: 2, tail: 6, buff: &RuneBuffer{'c', z, 'a', 'X', 'b'}}, true},
+		},
+	} {
+		t.Run(tt.string, func(t *testing.T) {
+			bool := tt.in.State.Insert(tt.in.int, tt.in.Data)
+			if !reflect.DeepEqual(tt.in.State, tt.out.State) {
+				t.Errorf("State.Insert(%d, %+v): State: got:%s != want:%s", tt.in.int, tt.in.Data, tt.in.State, tt.out.State)
+			}
+			if bool != tt.out.bool {
+				t.Errorf("State.Insert(%d, %+v): bool: got:%v != want:%v", tt.in.int, tt.in.Data, bool, tt.out.bool)
 			}
 		})
 	}
