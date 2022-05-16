@@ -1,3 +1,10 @@
+// Package fifo defines types and methods for managing a statically-sized,
+// circular FIFO (queue) data structure.
+// The principle object managing FIFO state and operations is of type State.
+// The concrete type containing queue elements is a user-provided implementation
+// of the Buffer interface.
+// The behavior of enqueue operations on a full queue is specified with type
+// OverflowMode.
 package fifo
 
 import (
