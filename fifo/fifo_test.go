@@ -9,19 +9,19 @@ import (
 	"github.com/ardnew/embedit/volatile"
 )
 
-const z = rune(0)
+const z = '\uFFFD'
 
-// RuneBuffer implements the Buffer interface for a rune slice.
-type RuneBuffer []rune
+// runeBuffer implements the Buffer interface for a rune slice.
+type runeBuffer []rune
 
 // Len returns the size of the receiver.
-func (rb *RuneBuffer) Len() int {
+func (rb *runeBuffer) Len() int {
 	return len(*rb)
 }
 
 // Get returns a Data (of concrete type rune) at the given index and true.
 // Returns nil and false if the index is out of bounds.
-func (rb *RuneBuffer) Get(i int) (data Data, ok bool) {
+func (rb *runeBuffer) Get(i int) (data Data, ok bool) {
 	if rb != nil && 0 <= i && i < rb.Len() {
 		data, ok = (*rb)[i], true
 	}
@@ -30,7 +30,7 @@ func (rb *RuneBuffer) Get(i int) (data Data, ok bool) {
 
 // Set sets the rune element at the given index and returns true.
 // Returns false if the index is out of bounds or given Data type is not rune.
-func (rb *RuneBuffer) Set(i int, data Data) (ok bool) {
+func (rb *runeBuffer) Set(i int, data Data) (ok bool) {
 	if rb != nil && 0 <= i && i < rb.Len() {
 		// Don't write to the buffer unless type assertion succeeds.
 		var c rune
@@ -41,7 +41,7 @@ func (rb *RuneBuffer) Set(i int, data Data) (ok bool) {
 	return
 }
 
-func (rb *RuneBuffer) String() string {
+func (rb *runeBuffer) String() string {
 	if rb == nil {
 		return "<nil>"
 	}
@@ -118,17 +118,17 @@ func TestNew(t *testing.T) {
 			},
 		}, {
 			"buff-zero",
-			in{&RuneBuffer{}, volatile.Register32{0}, DiscardLast},
+			in{&runeBuffer{}, volatile.Register32{0}, DiscardLast},
 			out{
-				State: &State{capa: volatile.Register32{0}, head: volatile.Register32{0}, tail: volatile.Register32{0}, mode: DiscardLast, buff: &RuneBuffer{}},
+				State: &State{capa: volatile.Register32{0}, head: volatile.Register32{0}, tail: volatile.Register32{0}, mode: DiscardLast, buff: &runeBuffer{}},
 				cap:   0,
 				rem:   0,
 			},
 		}, {
 			"greater-than-phy",
-			in{&RuneBuffer{'a', 'b', 'c', 'd', 'e'}, volatile.Register32{10}, DiscardFirst},
+			in{&runeBuffer{'a', 'b', 'c', 'd', 'e'}, volatile.Register32{10}, DiscardFirst},
 			out{
-				State: &State{capa: volatile.Register32{5}, head: volatile.Register32{0}, tail: volatile.Register32{0}, mode: DiscardFirst, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e'}},
+				State: &State{capa: volatile.Register32{5}, head: volatile.Register32{0}, tail: volatile.Register32{0}, mode: DiscardFirst, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e'}},
 				cap:   5,
 				rem:   5,
 			},
@@ -169,7 +169,7 @@ func TestState_String(t *testing.T) {
 	}{
 		{
 			"basic",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{3}, tail: volatile.Register32{6}, buff: &RuneBuffer{z, 'a', 'b', 'c', z}}},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{3}, tail: volatile.Register32{6}, buff: &runeBuffer{z, 'a', 'b', 'c', z}}},
 			out{"{mode:OverflowMode(DiscardLast), capa:5, head:3, tail:6[1], size:3, buff:[.abc.]}"},
 		}, {
 			"state-nil",
@@ -181,7 +181,7 @@ func TestState_String(t *testing.T) {
 			out{"{mode:OverflowMode(DiscardLast), capa:2, head:5[1], tail:100[0], size:95, buff:<nil>}"},
 		}, {
 			"buff-zero",
-			in{&State{buff: &RuneBuffer{}}},
+			in{&State{buff: &runeBuffer{}}},
 			out{"{mode:OverflowMode(DiscardLast), capa:0, head:0, tail:0, size:0, buff:[]}"},
 		},
 	} {
@@ -254,15 +254,15 @@ func TestState_Deq(t *testing.T) {
 			out{nil, false},
 		}, {
 			"buff-empty",
-			in{&State{capa: volatile.Register32{10}, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &RuneBuffer{}}},
+			in{&State{capa: volatile.Register32{10}, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &runeBuffer{}}},
 			out{nil, false},
 		}, {
 			"buff-single",
-			in{&State{capa: volatile.Register32{10}, head: volatile.Register32{9}, tail: volatile.Register32{10}, buff: &RuneBuffer{z, z, z, z, z, z, z, z, z, 'X'}}},
+			in{&State{capa: volatile.Register32{10}, head: volatile.Register32{9}, tail: volatile.Register32{10}, buff: &runeBuffer{z, z, z, z, z, z, z, z, z, 'X'}}},
 			out{'X', true},
 		}, {
 			"buff-full",
-			in{&State{capa: volatile.Register32{10}, head: volatile.Register32{12}, tail: volatile.Register32{22}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}}},
+			in{&State{capa: volatile.Register32{10}, head: volatile.Register32{12}, tail: volatile.Register32{22}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}}},
 			out{'c', true},
 		},
 	} {
@@ -306,20 +306,20 @@ func TestState_Enq(t *testing.T) {
 			out{&State{capa: volatile.Register32{10}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{9}, buff: nil}, false},
 		}, {
 			"buff-empty",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &RuneBuffer{z, z, z, z, z}}, 'X'},
-			out{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{1}, buff: &RuneBuffer{'X', z, z, z, z}}, true},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &runeBuffer{z, z, z, z, z}}, 'X'},
+			out{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{1}, buff: &runeBuffer{'X', z, z, z, z}}, true},
 		}, {
 			"buff-single",
-			in{&State{capa: volatile.Register32{10}, mode: DiscardLast, head: volatile.Register32{9}, tail: volatile.Register32{10}, buff: &RuneBuffer{z, z, z, z, z, z, z, z, z, 'X'}}, 'X'},
-			out{&State{capa: volatile.Register32{10}, mode: DiscardLast, head: volatile.Register32{9}, tail: volatile.Register32{11}, buff: &RuneBuffer{'X', z, z, z, z, z, z, z, z, 'X'}}, true},
+			in{&State{capa: volatile.Register32{10}, mode: DiscardLast, head: volatile.Register32{9}, tail: volatile.Register32{10}, buff: &runeBuffer{z, z, z, z, z, z, z, z, z, 'X'}}, 'X'},
+			out{&State{capa: volatile.Register32{10}, mode: DiscardLast, head: volatile.Register32{9}, tail: volatile.Register32{11}, buff: &runeBuffer{'X', z, z, z, z, z, z, z, z, 'X'}}, true},
 		}, {
 			"discard-last",
-			in{&State{capa: volatile.Register32{10}, mode: DiscardLast, head: volatile.Register32{12}, tail: volatile.Register32{22}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}}, 'X'},
-			out{&State{capa: volatile.Register32{10}, mode: DiscardLast, head: volatile.Register32{12}, tail: volatile.Register32{22}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}}, false},
+			in{&State{capa: volatile.Register32{10}, mode: DiscardLast, head: volatile.Register32{12}, tail: volatile.Register32{22}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}}, 'X'},
+			out{&State{capa: volatile.Register32{10}, mode: DiscardLast, head: volatile.Register32{12}, tail: volatile.Register32{22}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}}, false},
 		}, {
 			"discard-first",
-			in{&State{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{12}, tail: volatile.Register32{22}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}}, 'X'},
-			out{&State{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{13}, tail: volatile.Register32{23}, buff: &RuneBuffer{'a', 'b', 'X', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}}, true},
+			in{&State{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{12}, tail: volatile.Register32{22}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}}, 'X'},
+			out{&State{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{13}, tail: volatile.Register32{23}, buff: &runeBuffer{'a', 'b', 'X', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}}, true},
 		},
 	} {
 		t.Run(tt.string, func(t *testing.T) {
@@ -359,23 +359,23 @@ func TestState_Read(t *testing.T) {
 			out{0, true, []Data{nil, nil, nil, nil, nil, nil, nil, nil, nil, nil}},
 		}, {
 			"data-nil",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &RuneBuffer{z, z, z, z, z}}, nil},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &runeBuffer{z, z, z, z, z}}, nil},
 			out{0, true, nil},
 		}, {
 			"data-empty",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{1}, buff: &RuneBuffer{'X', z, z, z, z}}, []Data{}},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{1}, buff: &runeBuffer{'X', z, z, z, z}}, []Data{}},
 			out{0, true, []Data{}},
 		}, {
 			"buff-empty",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &RuneBuffer{z, z, z, z, z}}, make([]Data, 10)},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &runeBuffer{z, z, z, z, z}}, make([]Data, 10)},
 			out{0, true, []Data{nil, nil, nil, nil, nil, nil, nil, nil, nil, nil}},
 		}, {
 			"buff-short",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{8}, tail: volatile.Register32{10}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e'}}, make([]Data, 10)},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{8}, tail: volatile.Register32{10}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e'}}, make([]Data, 10)},
 			out{2, false, []Data{'d', 'e', nil, nil, nil, nil, nil, nil, nil, nil}},
 		}, {
 			"data-short",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{6}, tail: volatile.Register32{10}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e'}}, make([]Data, 2)},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{6}, tail: volatile.Register32{10}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e'}}, make([]Data, 2)},
 			out{2, false, []Data{'b', 'c'}},
 		},
 	} {
@@ -426,66 +426,66 @@ func TestState_Write(t *testing.T) {
 		}, {
 			"data-nil",
 			in{
-				&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &RuneBuffer{z, z, z, z, z}},
+				&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &runeBuffer{z, z, z, z, z}},
 				nil,
 			},
-			out{0, true, &State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &RuneBuffer{z, z, z, z, z}}},
+			out{0, true, &State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &runeBuffer{z, z, z, z, z}}},
 		}, {
 			"data-empty",
 			in{
-				&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &RuneBuffer{z, z, z, z, z}},
+				&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &runeBuffer{z, z, z, z, z}},
 				[]Data{},
 			},
-			out{0, true, &State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &RuneBuffer{z, z, z, z, z}}},
+			out{0, true, &State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &runeBuffer{z, z, z, z, z}}},
 		}, {
 			"zero-cap",
 			in{
-				&State{capa: volatile.Register32{0}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &RuneBuffer{z, z, z, z, z}},
+				&State{capa: volatile.Register32{0}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &runeBuffer{z, z, z, z, z}},
 				[]Data{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'},
 			},
-			out{0, true, &State{capa: volatile.Register32{0}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &RuneBuffer{z, z, z, z, z}}},
+			out{0, true, &State{capa: volatile.Register32{0}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &runeBuffer{z, z, z, z, z}}},
 		}, {
 			"mode-invalid",
 			in{
-				&State{capa: volatile.Register32{5}, mode: OverflowMode(^byte(0)), head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &RuneBuffer{z, z, z, z, z}},
+				&State{capa: volatile.Register32{5}, mode: OverflowMode(^byte(0)), head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &runeBuffer{z, z, z, z, z}},
 				[]Data{'a'},
 			},
-			out{0, true, &State{capa: volatile.Register32{5}, mode: OverflowMode(^byte(0)), head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &RuneBuffer{z, z, z, z, z}}},
+			out{0, true, &State{capa: volatile.Register32{5}, mode: OverflowMode(^byte(0)), head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &runeBuffer{z, z, z, z, z}}},
 		}, {
 			"discard-last",
 			in{
-				&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{2}, tail: volatile.Register32{7}, buff: &RuneBuffer{'d', 'e', 'a', 'b', 'c'}},
+				&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{2}, tail: volatile.Register32{7}, buff: &runeBuffer{'d', 'e', 'a', 'b', 'c'}},
 				[]Data{'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'},
 			},
-			out{0, true, &State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{2}, tail: volatile.Register32{7}, buff: &RuneBuffer{'d', 'e', 'a', 'b', 'c'}}},
+			out{0, true, &State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{2}, tail: volatile.Register32{7}, buff: &runeBuffer{'d', 'e', 'a', 'b', 'c'}}},
 		}, {
 			"short-write",
 			in{
-				&State{capa: volatile.Register32{10}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{7}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', z, z, z}},
+				&State{capa: volatile.Register32{10}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{7}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', z, z, z}},
 				[]Data{'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'},
 			},
-			out{3, false, &State{capa: volatile.Register32{10}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{10}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'q', 'r', 's'}}},
+			out{3, false, &State{capa: volatile.Register32{10}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{10}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'q', 'r', 's'}}},
 		}, {
 			"discard-first",
 			in{
-				&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{7}, buff: &RuneBuffer{'d', 'e', 'a', 'b', 'c'}},
+				&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{7}, buff: &runeBuffer{'d', 'e', 'a', 'b', 'c'}},
 				[]Data{'q', 'r', 's'},
 			},
-			out{3, false, &State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{5}, tail: volatile.Register32{10}, buff: &RuneBuffer{'d', 'e', 'q', 'r', 's'}}},
+			out{3, false, &State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{5}, tail: volatile.Register32{10}, buff: &runeBuffer{'d', 'e', 'q', 'r', 's'}}},
 		}, {
 			"discard-cap",
 			in{
-				&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{7}, buff: &RuneBuffer{'d', 'e', 'a', 'b', 'c'}},
+				&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{7}, buff: &runeBuffer{'d', 'e', 'a', 'b', 'c'}},
 				[]Data{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'},
 			},
-			out{10, false, &State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{0}, tail: volatile.Register32{5}, buff: &RuneBuffer{'f', 'g', 'h', 'i', 'j'}}},
+			out{10, false, &State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{0}, tail: volatile.Register32{5}, buff: &runeBuffer{'f', 'g', 'h', 'i', 'j'}}},
 		}, {
 			"last-zero-cap",
 			in{
-				&State{capa: volatile.Register32{0}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &RuneBuffer{z, z, z, z, z}},
+				&State{capa: volatile.Register32{0}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &runeBuffer{z, z, z, z, z}},
 				make([]Data, 10),
 			},
-			out{0, true, &State{capa: volatile.Register32{0}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &RuneBuffer{z, z, z, z, z}}},
+			out{0, true, &State{capa: volatile.Register32{0}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &runeBuffer{z, z, z, z, z}}},
 		},
 	} {
 		t.Run(tt.string, func(t *testing.T) {
@@ -534,7 +534,7 @@ func TestState_Get(t *testing.T) {
 		}, {
 			"[0]FIFO:",
 			in{
-				&State{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{6}, tail: volatile.Register32{6}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+				&State{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{6}, tail: volatile.Register32{6}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
 				[]int{0, 1, -1},
 			},
 			out{
@@ -544,7 +544,7 @@ func TestState_Get(t *testing.T) {
 		}, {
 			"[4]FIFO:",
 			in{
-				&State{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{6}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+				&State{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{6}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
 				[]int{0, 3, -4, -1, 4, -5},
 			},
 			out{
@@ -617,50 +617,50 @@ func TestState_Set(t *testing.T) {
 		}, {
 			"[0]FIFO:",
 			in{
-				&State{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{6}, tail: volatile.Register32{6}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+				&State{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{6}, tail: volatile.Register32{6}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
 				[]int{0, 1, -1},
 				[]Data{nil, nil, nil},
 			},
 			out{
 				[]bool{false, false, false},
 				[]*State{
-					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{6}, tail: volatile.Register32{6}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
-					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{6}, tail: volatile.Register32{6}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
-					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{6}, tail: volatile.Register32{6}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{6}, tail: volatile.Register32{6}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{6}, tail: volatile.Register32{6}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{6}, tail: volatile.Register32{6}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
 				},
 			},
 		}, {
 			"[4]FIFO:",
 			in{
-				&State{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{6}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+				&State{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{6}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
 				[]int{0, 3, 1, 4, 4},
 				[]Data{'x', 'y', nil, nil, 'z'},
 			},
 			out{
 				[]bool{true, true, false, false, false},
 				[]*State{
-					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{6}, buff: &RuneBuffer{'a', 'b', 'x', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
-					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{6}, buff: &RuneBuffer{'a', 'b', 'x', 'd', 'e', 'y', 'g', 'h', 'i', 'j'}},
-					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{6}, buff: &RuneBuffer{'a', 'b', 'x', 'd', 'e', 'y', 'g', 'h', 'i', 'j'}},
-					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{6}, buff: &RuneBuffer{'a', 'b', 'x', 'd', 'e', 'y', 'g', 'h', 'i', 'j'}},
-					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{6}, buff: &RuneBuffer{'a', 'b', 'x', 'd', 'e', 'y', 'g', 'h', 'i', 'j'}},
+					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{6}, buff: &runeBuffer{'a', 'b', 'x', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{6}, buff: &runeBuffer{'a', 'b', 'x', 'd', 'e', 'y', 'g', 'h', 'i', 'j'}},
+					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{6}, buff: &runeBuffer{'a', 'b', 'x', 'd', 'e', 'y', 'g', 'h', 'i', 'j'}},
+					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{6}, buff: &runeBuffer{'a', 'b', 'x', 'd', 'e', 'y', 'g', 'h', 'i', 'j'}},
+					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{6}, buff: &runeBuffer{'a', 'b', 'x', 'd', 'e', 'y', 'g', 'h', 'i', 'j'}},
 				},
 			},
 		}, {
 			"[10]FIFO:",
 			in{
-				&State{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{12}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+				&State{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{12}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
 				[]int{-1, -10, -2, -11},
 				[]Data{'x', 'y', nil, nil, 'z'},
 			},
 			out{
 				[]bool{true, true, false, false, false},
 				[]*State{
-					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{12}, buff: &RuneBuffer{'a', 'x', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
-					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{12}, buff: &RuneBuffer{'a', 'x', 'y', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
-					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{12}, buff: &RuneBuffer{'a', 'x', 'y', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
-					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{12}, buff: &RuneBuffer{'a', 'x', 'y', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
-					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{12}, buff: &RuneBuffer{'a', 'x', 'y', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{12}, buff: &runeBuffer{'a', 'x', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{12}, buff: &runeBuffer{'a', 'x', 'y', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{12}, buff: &runeBuffer{'a', 'x', 'y', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{12}, buff: &runeBuffer{'a', 'x', 'y', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
+					{capa: volatile.Register32{10}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{12}, buff: &runeBuffer{'a', 'x', 'y', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}},
 				},
 			},
 		},
@@ -720,15 +720,15 @@ func TestState_First(t *testing.T) {
 			out{nil},
 		}, {
 			"buff-zero",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{1}, tail: volatile.Register32{3}, buff: &RuneBuffer{}}},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{1}, tail: volatile.Register32{3}, buff: &runeBuffer{}}},
 			out{nil},
 		}, {
 			"normal",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{1}, tail: volatile.Register32{3}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e'}}},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{1}, tail: volatile.Register32{3}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e'}}},
 			out{'b'},
 		}, {
 			"overflow",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{19}, tail: volatile.Register32{22}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e'}}},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{19}, tail: volatile.Register32{22}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e'}}},
 			out{'e'},
 		},
 	} {
@@ -762,15 +762,15 @@ func TestState_Last(t *testing.T) {
 			out{nil},
 		}, {
 			"buff-zero",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{1}, tail: volatile.Register32{3}, buff: &RuneBuffer{}}},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{1}, tail: volatile.Register32{3}, buff: &runeBuffer{}}},
 			out{nil},
 		}, {
 			"normal",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{1}, tail: volatile.Register32{3}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e'}}},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{1}, tail: volatile.Register32{3}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e'}}},
 			out{'c'},
 		}, {
 			"overflow",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{19}, tail: volatile.Register32{22}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e'}}},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{19}, tail: volatile.Register32{22}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e'}}},
 			out{'b'},
 		},
 	} {
@@ -807,24 +807,24 @@ func TestState_Remove(t *testing.T) {
 			out{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: nil}, nil, false},
 		}, {
 			"buff-zero",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &RuneBuffer{}}, 0},
-			out{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &RuneBuffer{}}, nil, false},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &runeBuffer{}}, 0},
+			out{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &runeBuffer{}}, nil, false},
 		}, {
 			"invalid-index",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{1}, tail: volatile.Register32{3}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e'}}, 2},
-			out{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{1}, tail: volatile.Register32{3}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e'}}, nil, false},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{1}, tail: volatile.Register32{3}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e'}}, 2},
+			out{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{1}, tail: volatile.Register32{3}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e'}}, nil, false},
 		}, {
 			"circular",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{19}, tail: volatile.Register32{22}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e'}}, 0},
-			out{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{19}, tail: volatile.Register32{21}, buff: &RuneBuffer{'b', 'b', 'c', 'd', 'a'}}, 'e', true},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{19}, tail: volatile.Register32{22}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e'}}, 0},
+			out{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{19}, tail: volatile.Register32{21}, buff: &runeBuffer{'b', 'b', 'c', 'd', 'a'}}, 'e', true},
 		}, {
 			"first",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{1}, tail: volatile.Register32{3}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e'}}, 0},
-			out{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{1}, tail: volatile.Register32{2}, buff: &RuneBuffer{'a', 'c', 'c', 'd', 'e'}}, 'b', true},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{1}, tail: volatile.Register32{3}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e'}}, 0},
+			out{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{1}, tail: volatile.Register32{2}, buff: &runeBuffer{'a', 'c', 'c', 'd', 'e'}}, 'b', true},
 		}, {
 			"last",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{4}, tail: volatile.Register32{6}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e'}}, 1},
-			out{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{4}, tail: volatile.Register32{5}, buff: &RuneBuffer{'a', 'b', 'c', 'd', 'e'}}, 'a', true},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{4}, tail: volatile.Register32{6}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e'}}, 1},
+			out{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{4}, tail: volatile.Register32{5}, buff: &runeBuffer{'a', 'b', 'c', 'd', 'e'}}, 'a', true},
 		},
 	} {
 		t.Run(tt.string, func(t *testing.T) {
@@ -867,40 +867,40 @@ func TestState_Insert(t *testing.T) {
 			out{&State{capa: volatile.Register32{0}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: nil}, false},
 		}, {
 			"data-nil",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{1}, buff: &RuneBuffer{'a', z, z, z, z}}, 0, nil},
-			out{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{1}, buff: &RuneBuffer{'a', 'a', z, z, z}}, false},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{1}, buff: &runeBuffer{'a', z, z, z, z}}, 0, nil},
+			out{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{1}, buff: &runeBuffer{'a', 'a', z, z, z}}, false},
 		}, {
 			"zero-cap",
-			in{&State{capa: volatile.Register32{0}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &RuneBuffer{z, z, z, z, z}}, 0, 'X'},
-			out{&State{capa: volatile.Register32{0}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &RuneBuffer{z, z, z, z, z}}, false},
+			in{&State{capa: volatile.Register32{0}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &runeBuffer{z, z, z, z, z}}, 0, 'X'},
+			out{&State{capa: volatile.Register32{0}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &runeBuffer{z, z, z, z, z}}, false},
 		}, {
 			"zero-len",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &RuneBuffer{z, z, z, z, z}}, 0, 'X'},
-			out{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &RuneBuffer{z, z, z, z, z}}, false},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &runeBuffer{z, z, z, z, z}}, 0, 'X'},
+			out{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{0}, tail: volatile.Register32{0}, buff: &runeBuffer{z, z, z, z, z}}, false},
 		}, {
 			"head-last",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{2}, tail: volatile.Register32{7}, buff: &RuneBuffer{'d', 'e', 'a', 'b', 'c'}}, 0, 'X'},
-			out{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{2}, tail: volatile.Register32{7}, buff: &RuneBuffer{'c', 'd', 'X', 'a', 'b'}}, true},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{2}, tail: volatile.Register32{7}, buff: &runeBuffer{'d', 'e', 'a', 'b', 'c'}}, 0, 'X'},
+			out{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{2}, tail: volatile.Register32{7}, buff: &runeBuffer{'c', 'd', 'X', 'a', 'b'}}, true},
 		}, {
 			"head-first",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{7}, buff: &RuneBuffer{'d', 'e', 'a', 'b', 'c'}}, 0, 'X'},
-			out{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{3}, tail: volatile.Register32{8}, buff: &RuneBuffer{'c', 'd', 'e', 'X', 'b'}}, true},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{7}, buff: &runeBuffer{'d', 'e', 'a', 'b', 'c'}}, 0, 'X'},
+			out{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{3}, tail: volatile.Register32{8}, buff: &runeBuffer{'c', 'd', 'e', 'X', 'b'}}, true},
 		}, {
 			"tail-last",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{2}, tail: volatile.Register32{7}, buff: &RuneBuffer{'d', 'e', 'a', 'b', 'c'}}, 4, 'X'},
-			out{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{2}, tail: volatile.Register32{7}, buff: &RuneBuffer{'d', 'X', 'a', 'b', 'c'}}, true},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{2}, tail: volatile.Register32{7}, buff: &runeBuffer{'d', 'e', 'a', 'b', 'c'}}, 4, 'X'},
+			out{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{2}, tail: volatile.Register32{7}, buff: &runeBuffer{'d', 'X', 'a', 'b', 'c'}}, true},
 		}, {
 			"tail-first",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{7}, buff: &RuneBuffer{'d', 'e', 'a', 'b', 'c'}}, 4, 'X'},
-			out{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{3}, tail: volatile.Register32{8}, buff: &RuneBuffer{'d', 'e', 'X', 'b', 'c'}}, true},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{7}, buff: &runeBuffer{'d', 'e', 'a', 'b', 'c'}}, 4, 'X'},
+			out{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{3}, tail: volatile.Register32{8}, buff: &runeBuffer{'d', 'e', 'X', 'b', 'c'}}, true},
 		}, {
 			"mid-last",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{2}, tail: volatile.Register32{5}, buff: &RuneBuffer{z, z, 'a', 'b', 'c'}}, 1, 'X'},
-			out{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{2}, tail: volatile.Register32{6}, buff: &RuneBuffer{'c', z, 'a', 'X', 'b'}}, true},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{2}, tail: volatile.Register32{5}, buff: &runeBuffer{z, z, 'a', 'b', 'c'}}, 1, 'X'},
+			out{&State{capa: volatile.Register32{5}, mode: DiscardLast, head: volatile.Register32{2}, tail: volatile.Register32{6}, buff: &runeBuffer{'c', z, 'a', 'X', 'b'}}, true},
 		}, {
 			"mid-first",
-			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{5}, buff: &RuneBuffer{z, z, 'a', 'b', 'c'}}, 1, 'X'},
-			out{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{6}, buff: &RuneBuffer{'c', z, 'a', 'X', 'b'}}, true},
+			in{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{5}, buff: &runeBuffer{z, z, 'a', 'b', 'c'}}, 1, 'X'},
+			out{&State{capa: volatile.Register32{5}, mode: DiscardFirst, head: volatile.Register32{2}, tail: volatile.Register32{6}, buff: &runeBuffer{'c', z, 'a', 'X', 'b'}}, true},
 		},
 	} {
 		t.Run(tt.string, func(t *testing.T) {
