@@ -1,75 +1,79 @@
 package line
 
 import (
-	"strings"
+	"io"
 
-	"github.com/ardnew/embedit/fifo"
+	"github.com/ardnew/embedit/key"
 	"github.com/ardnew/embedit/limit"
+	"github.com/ardnew/embedit/volatile"
 )
 
-// ErrorRune represents an invalid rune.
-const ErrorRune = '\uFFFD'
+// Types of errors returned by Line methods.
+type (
+	ErrReceiver  string
+	ErrArgument  string
+	ErrOverflow  string
+	ErrUnderflow string
+)
 
-// Line represents a single line of input. It implements the fifo.Buffer
-// interface for use as a fixed-length FIFO.
+// Line represents a single line of input.
 type Line struct {
-	FIFO fifo.State
-	Rune [limit.RunesPerLine]rune
-	Pos  int
+	Rune  [limit.RunesPerLine]rune
+	Pos   volatile.Register32 // Logical cursor position
+	valid bool                // Has init been called
 }
 
-// Init initializes all fields of the receiver.
-func (l *Line) Init() {
+// Invalid represents an invalid Line.
+var Invalid = Line{valid: false}
+
+// Configure initializes the Line configuration.
+func (l *Line) Configure() *Line {
+	l.valid = false
+	return l.init()
+}
+
+// init initializes the state of a configured Line.
+func (l *Line) init() *Line {
+	l.valid = true
+	return l.Reset()
+}
+
+// Reset sets all runes to key.Null and resets the logical cursor position.
+func (l *Line) Reset() *Line {
 	for i := range l.Rune {
-		l.Rune[i] = rune(0)
+		l.Rune[i] = key.Null
 	}
-	l.FIFO.Init(l, len(l.Rune), fifo.DiscardLast)
-	l.Pos = 0
-}
-
-// Len returns the size of the receiver.
-func (l *Line) Len() int {
-	return len(l.Rune)
-}
-
-// Get returns a Data (of concrete type rune) at the given index and true.
-// Returns nil and false if the index is out of bounds.
-func (l *Line) Get(i int) (data fifo.Data, ok bool) {
-	if l != nil && 0 <= i && i < l.Len() {
-		data, ok = l.Rune[i], true
-	}
-	return
-}
-
-// Set sets the rune element at the given index and returns true.
-// Returns false if the index is out of bounds or given Data type is not rune.
-func (l *Line) Set(i int, data fifo.Data) (ok bool) {
-	if l != nil && 0 <= i && i < l.Len() {
-		// Don't write to the buffer unless type assertion succeeds.
-		var c rune
-		if c, ok = data.(rune); ok {
-			l.Rune[i] = c
-		}
-	}
-	return
+	l.Pos.Set(0)
+	return l
 }
 
 func (l *Line) String() string {
-	if l == nil {
-		return "<nil>"
+	if l.valid {
+		return string(l.Rune[0:])
 	}
-	var sb strings.Builder
-	sb.Grow(l.FIFO.Len())
-	for i := 0; i < l.FIFO.Len(); i++ {
-		data, ok := l.FIFO.Get(i)
-		if !ok {
-			break
-		}
-		c, ok := data.(rune)
-		if !ok || c == rune(0) || c == ErrorRune {
-			break
-		}
-		sb.WriteRune(c)
-	}
-	return sb.String()
+	return ""
 }
+
+func (l *Line) Read(a []byte) (n int, err error) {
+	if l == nil {
+		return 0, ErrReceiver("cannot Read from nil receiver")
+	}
+	if a == nil {
+		return 0, ErrArgument("cannot Read to nil buffer")
+	}
+	s := string(l.Rune[:])
+	c := len(s)
+	if c == 0 {
+		return 0, io.EOF
+	}
+	n = copy(a, []byte(s))
+	if n == c {
+		err = io.EOF
+	}
+	return
+}
+
+func (e ErrReceiver) Error() string  { return "line [receiver]: " + string(e) }
+func (e ErrArgument) Error() string  { return "line [argument]: " + string(e) }
+func (e ErrOverflow) Error() string  { return "line [overflow]: " + string(e) }
+func (e ErrUnderflow) Error() string { return "line [underflow]: " + string(e) }

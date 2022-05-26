@@ -1,0 +1,52 @@
+package ascii
+
+import (
+	"fmt"
+	"testing"
+)
+
+func TestAppendu(t *testing.T) {
+	buf := [][]byte{
+		nil,
+		make([]byte, 0),
+		make([]byte, 0, 10),
+		make([]byte, 5, 10),
+		make([]byte, 10),
+		[]byte(""),
+		[]byte("abc"),
+		[]byte("0"),
+		[]byte("1234567890"),
+	}
+	for _, tt := range []uint32{
+		0,
+		1,
+		12,
+		123,
+		1234,
+		12345,
+		123456,
+		1234567,
+		12345678,
+		123456789,
+		987654321,
+		98765432,
+		9876543,
+		987654,
+		98765,
+		9876,
+		987,
+		98,
+		9,
+		^uint32(0),
+	} {
+		// for tt := uint32(0); tt < ^uint32(0); tt++ {
+		for _, tb := range buf {
+			s := fmt.Sprintf("%s%d", tb, tt)
+			t.Run(fmt.Sprintf("%#v,%d", tb, tt), func(t *testing.T) {
+				if got := Appendu(tb, tt); got != s {
+					t.Fatalf("Utoa() = %v, want %v", got, s)
+				}
+			})
+		}
+	}
+}

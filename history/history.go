@@ -1,86 +1,67 @@
 package history
 
 import (
-	"strings"
-
-	"github.com/ardnew/embedit/fifo"
 	"github.com/ardnew/embedit/limit"
 	"github.com/ardnew/embedit/line"
+	"github.com/ardnew/embedit/volatile"
 )
 
-// History contains previous user-input Lines. It implements the fifo.Buffer
-// interface for use as a fixed-length FIFO.
+// History contains previous user-input Lines.
 type History struct {
-	FIFO fifo.State
-	Line [limit.LinesPerHistory]line.Line
-	Pos  int
+	line  [limit.LinesPerHistory]line.Line
+	head  volatile.Register32
+	size  volatile.Register32
+	indx  volatile.Register32
+	pend  line.Line
+	valid bool // Has init been called
 }
 
-// Init initializes all fields of the receiver.
-func (h *History) Init() {
-	for _, l := range h.Line {
-		l.Init()
+// Configure initializes the History configuration.
+func (h *History) Configure() *History {
+	h.valid = false
+	for _, l := range h.line {
+		_ = l.Configure()
 	}
-	h.FIFO.Init(h, len(h.Line), fifo.DiscardFirst)
-	h.Pos = 0
+	h.pend.Configure()
+	return h.init()
 }
 
-// Len returns the size of the receiver.
+// init initializes the state of a configured History.
+func (h *History) init() *History {
+	h.valid = true
+	h.head.Set(0)
+	h.size.Set(0)
+	h.indx.Set(0)
+	return h
+}
+
+// Len returns the number of Lines currently stored in History.
 func (h *History) Len() int {
-	return len(h.Line)
+	return int(h.size.Get())
 }
 
-// Get returns a Data (of concrete type rune) at the given index and true.
-// Returns nil and false if the index is out of bounds.
-func (h *History) Get(i int) (data fifo.Data, ok bool) {
-	if h != nil && 0 <= i && i < h.Len() {
-		data, ok = h.Line[i], true
+// Add appends a Line to the History.
+// If the History is filled to capacity, the oldest Line is discarded.
+func (h *History) Add(ln line.Line) {
+	head := (h.head.Get() + 1) % limit.LinesPerHistory
+	h.head.Set(head)
+	h.line[head] = ln
+	if size := h.size.Get(); size < limit.LinesPerHistory {
+		h.size.Set(size + 1)
 	}
-	return
 }
 
-// Set sets the rune element at the given index and returns true.
-// Returns false if the index is out of bounds or given Data type is not rune.
-func (h *History) Set(i int, data fifo.Data) (ok bool) {
-	if h != nil && 0 <= i && i < h.Len() {
-		// Don't write to the buffer unless type assertion succeeds.
-		var l line.Line
-		if l, ok = data.(line.Line); ok {
-			h.Line[i] = l
-		}
+// Get returns the Line passed to the n'th previous call to Add.
+// If n=0, the immediately previous Line is returned; if n=1, the Line before
+// that, and so on.
+// If n<0 or fewer than n+1 lines have been added, ok is false.
+func (h *History) Get(n int) (ln line.Line, ok bool) {
+	if n < 0 || n >= int(h.size.Get()) {
+		return line.Invalid, false
 	}
-	return
-}
-
-func (h *History) String() string {
-	if h == nil {
-		return "<nil>"
+	index := int(h.head.Get()) - n
+	if index < 0 {
+		index += limit.LinesPerHistory
 	}
-	var sb strings.Builder
-	sb.Grow(h.FIFO.Len()*(limit.RunesPerLine+4) + 2)
-	sb.WriteString("[")
-	for i := 0; i < h.FIFO.Len(); i++ {
-		data, ok := h.FIFO.Get(i)
-		if !ok {
-			break
-		}
-		l, ok := data.(line.Line)
-		if !ok {
-			break
-		}
-		if i > 0 {
-			sb.WriteString(", ")
-		}
-		if i == l.Pos {
-			sb.WriteRune('<')
-		}
-		sb.WriteRune('"')
-		sb.WriteString(l.String())
-		sb.WriteRune('"')
-		if i == l.Pos {
-			sb.WriteRune('>')
-		}
-	}
-	sb.WriteString("]")
-	return sb.String()
+	return h.line[index], true
 }
