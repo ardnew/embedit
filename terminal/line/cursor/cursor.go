@@ -135,7 +135,7 @@ func (c *Cursor) Move(up, down, left, right int) (err error) {
 		return
 	}
 	// - - - - - - - - - - - - - - - - - - - -
-	// Left
+	// Right
 	b = []byte{}
 	if right == 1 {
 		b = append(b, key.Escape, '[', 'C')
@@ -149,7 +149,7 @@ func (c *Cursor) Move(up, down, left, right int) (err error) {
 		return
 	}
 	// - - - - - - - - - - - - - - - - - - - -
-	// Right
+	// Left
 	b = []byte{}
 	if left == 1 {
 		b = append(b, key.Escape, '[', 'D')
@@ -160,6 +160,7 @@ func (c *Cursor) Move(up, down, left, right int) (err error) {
 	}
 	// Append to output buffer
 	_, err = c.wire.Write(b)
+	c.wire.WriteWire()
 	return
 }
 

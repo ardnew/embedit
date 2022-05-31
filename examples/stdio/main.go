@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ardnew/embedit"
+	"github.com/ardnew/embedit/examples/stdio/sysio"
 )
 
 var (
@@ -21,11 +22,22 @@ var (
 func main() {
 	em.Configure(cf)
 
-	em.Line().Set([]rune("hello there"), 8)
-	em.Line().Cursor().Move(1, 2, 3, 4)
-	em.Line().Cursor().Move(6, 7, 8, 9)
-	for {
-		time.Sleep(time.Minute)
+	state := sysio.NewState(int(os.Stdin.Fd()))
+	if state != nil {
+		if err := state.Raw(); err != nil {
+			fmt.Println("error:", err)
+			return
+		}
+		defer state.Restore()
+
+		for {
+			em.Line().Set([]rune("hello there"), 5)
+			time.Sleep(2 * time.Second)
+			em.Line().Cursor().Move(0, 2, 0, 0)
+			time.Sleep(2 * time.Second)
+			em.Line().Cursor().Move(2, 0, 0, 10)
+			time.Sleep(10 * time.Second)
+		}
 	}
 }
 
@@ -35,7 +47,7 @@ type stdio struct {
 }
 
 func (s *stdio) Write(p []byte) (n int, err error) {
-	fmt.Printf("%#v\n", p)
+	// fmt.Printf("%#v\n", p)
 	fmt.Printf("%s", p)
 	return len(p), nil
 }
