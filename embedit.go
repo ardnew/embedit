@@ -4,8 +4,13 @@ import (
 	"io"
 
 	"github.com/ardnew/embedit/history"
-	"github.com/ardnew/embedit/line"
 	"github.com/ardnew/embedit/terminal"
+	"github.com/ardnew/embedit/terminal/line"
+)
+
+// Types of errors returned by Embedit methods.
+type (
+	ErrReceiver string
 )
 
 // Embedit defines the state and configuration of a line-buffered, commandline
@@ -19,23 +24,22 @@ import (
 type Embedit struct {
 	term  terminal.Terminal
 	hist  history.History
-	line  line.Line
 	valid bool // Has init been called
 }
 
 // Config defines the configuration parameters of an Embedit.
 type Config struct {
 	RW     io.ReadWriter
+	Prompt []rune
 	Width  int
 	Height int
 }
 
 // Configure initializes the Embedit configuration.
-func (e *Embedit) Configure(c Config) *Embedit {
+func (e *Embedit) Configure(config Config) *Embedit {
 	e.valid = false
-	_ = e.term.Configure(c.RW, c.Width, c.Height)
-	_ = e.hist.Configure()
-	_ = e.line.Configure()
+	_ = e.term.Configure(config.RW, config.Prompt, config.Width, config.Height)
+	_ = e.hist.Configure(&e.term, &e.term)
 	return e
 }
 
@@ -44,3 +48,13 @@ func (e *Embedit) init() *Embedit {
 	e.valid = true
 	return e
 }
+
+// Line returns the Terminal's active user input line.
+func (e *Embedit) Line() *line.Line {
+	if e == nil {
+		return nil
+	}
+	return e.term.Line()
+}
+
+func (e ErrReceiver) Error() string { return "embedit [receiver]: " + string(e) }

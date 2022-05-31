@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ardnew/embedit/limit"
+	"github.com/ardnew/embedit/sys"
 	"github.com/ardnew/embedit/volatile"
 )
 
@@ -42,38 +42,36 @@ func TestSequence_Append(t *testing.T) {
 			err:  false,
 		}, {
 			name: "full-seq",
-			seq:  &Sequence{size: volatile.Register32{Reg: limit.BytesPerSequence}, valid: true},
+			seq:  &Sequence{tail: volatile.Register32{Reg: sys.BytesPerSequence}, valid: true},
 			args: []byte{1, 2, 3, 4, 5},
 			want: []byte{1, 2, 3, 4, 5},
 			err:  true,
 		}, {
 			name: "part-seq",
-			seq:  &Sequence{size: volatile.Register32{Reg: limit.BytesPerSequence - 3}, valid: true},
+			seq:  &Sequence{tail: volatile.Register32{Reg: sys.BytesPerSequence - 3}, valid: true},
 			args: []byte{1, 2, 3, 4, 5},
 			want: []byte{4, 5},
 			err:  true,
 		},
 	}
-	zero := (&Sequence{}).Configure()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got, err := tt.seq.Append(tt.args); !reflect.DeepEqual(tt.args[got:], tt.want) {
-				t.Errorf("Sequence.Append() = %v, want %v", got, tt.want)
+				t.Errorf("Sequence.Append() = %v, want %v", tt.args[got:], tt.want)
 			} else if (err != nil) != tt.err {
 				t.Errorf("Sequence.Append(): error(%t) != %v", tt.err, err)
 			}
-			want := zero
+
 			if tt.seq == nil {
-				want = nil
-				if seq := tt.seq.Configure(); !reflect.DeepEqual(seq, want) {
-					t.Errorf("Sequence.Configure() = %v, want %v", seq, want)
+				if seq := tt.seq.Configure(); seq != nil {
+					t.Errorf("Sequence.Configure() = %v, want %v", seq, nil)
 				}
 				if len := tt.seq.Len(); len != 0 {
 					t.Errorf("Sequence.Len() = %d, want %d", len, 0)
 				}
 			}
-			if seq := tt.seq.Reset(); !reflect.DeepEqual(seq, want) {
-				t.Errorf("Sequence.Reset() = %v, want %v", seq, want)
+			if seq := tt.seq.Reset(); seq.Len() != 0 {
+				t.Errorf("Sequence.Reset(): Len=%d != %d", seq.Len(), 0)
 			}
 		})
 	}

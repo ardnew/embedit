@@ -43,7 +43,7 @@ func TestAppendu(t *testing.T) {
 		for _, tb := range buf {
 			s := fmt.Sprintf("%s%d", tb, tt)
 			t.Run(fmt.Sprintf("%#v,%d", tb, tt), func(t *testing.T) {
-				if got := Appendu(tb, tt); got != s {
+				if got := Appu(tb, tt); got != s {
 					t.Fatalf("Utoa() = %v, want %v", got, s)
 				}
 			})

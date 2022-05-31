@@ -2,12 +2,11 @@ package ascii
 
 // Utoa returns the decimal string representation of u.
 func Utoa(u uint32) string {
-	return Appendu(nil, u)
+	return Appu(nil, u)
 }
 
-// Appendu returns the decimal string representation of u appended to dst.
-// The returned string aliases into dst.
-func Appendu(dst []byte, u uint32) string {
+// Appu returns the decimal string representation of u appended to dst.
+func Appu(dst []byte, u uint32) string {
 	switch { // Fast paths for small integers
 	case u < 10:
 		return string(append(dst, "0123456789"[u:u+1]...))

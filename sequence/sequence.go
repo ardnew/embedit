@@ -1,8 +1,9 @@
 package sequence
 
 import (
-	"github.com/ardnew/embedit/encoding/ascii"
-	"github.com/ardnew/embedit/limit"
+	"io"
+
+	"github.com/ardnew/embedit/sys"
 	"github.com/ardnew/embedit/volatile"
 )
 
@@ -15,8 +16,9 @@ type (
 
 // Sequence defines an I/O buffer for Terminal control/data byte sequences.
 type Sequence struct {
-	Byte  [limit.BytesPerSequence]byte
-	size  volatile.Register32
+	Byte  [sys.BytesPerSequence]byte
+	head  volatile.Register32
+	tail  volatile.Register32
 	valid bool
 }
 
@@ -35,66 +37,111 @@ func (s *Sequence) Configure() *Sequence {
 // init initializes the state of a configured Sequence.
 func (s *Sequence) init() *Sequence {
 	s.valid = true
-	s.size.Set(0)
 	return s.Reset()
 }
 
-// Len returns the number of bytes in a Sequence.
+// Len returns the number of bytes in s.
 func (s *Sequence) Len() int {
 	if s == nil {
 		return 0
 	}
-	return int(s.size.Get())
+	return int(s.tail.Get() - s.head.Get())
 }
 
-// Reset clears all bytes and sets the Sequence length to 0.
+// Reset sets the Sequence length to 0.
 func (s *Sequence) Reset() *Sequence {
 	if s == nil {
 		return nil
 	}
-	for i := range s.Byte[:s.size.Get()] {
-		s.Byte[i] = 0
-	}
-	s.size.Set(0)
+	s.head.Set(0)
+	s.tail.Set(0)
 	return s
 }
 
-// Append copies up to len(a) bytes from a to the tail of a Sequence.
-func (s *Sequence) Append(a []byte) (n int, err error) {
+// Read copies up to len(p) bytes from s to p and returns the number of bytes
+// copied.
+func (s *Sequence) Read(p []byte) (n int, err error) {
 	if s == nil {
-		return 0, ErrReceiver("cannot Append to nil receiver")
+		return 0, ErrReceiver("cannot Read from nil receiver")
 	}
-	if a == nil {
-		return 0, ErrArgument("cannot Append from nil buffer")
+	if p == nil {
+		return 0, ErrArgument("cannot Read to nil buffer")
 	}
-	i := s.Len()
-	n = copy(s.Byte[i:], a)
-	i += n
-	s.size.Set(uint32(i))
-	if c := len(a); n < c {
-		err = ErrOverflow("limited Append to " + ascii.Utoa(uint32(n)) +
-			" of " + ascii.Utoa(uint32(c)) + " total bytes")
+	var ns int
+	ns, n = s.Len(), len(p)
+	if ns <= n {
+		n, err = ns, io.EOF
+	}
+	h := s.head.Get()
+	for i := range p[:n] {
+		p[i] = s.Byte[h%sys.BytesPerSequence]
+		h++
+	}
+	if err == io.EOF {
+		s.Reset()
+	} else {
+		s.head.Set(h)
 	}
 	return
 }
 
-// Write copies up to len(a) bytes from a to the head of a Sequence.
-// Write overwrites any bytes present.
-func (s *Sequence) Write(a []byte) (n int, err error) {
+// Write copies up to len(p) bytes from p to the start of s and returns the
+// number of bytes copied.
+//
+// Write overwrites any bytes present, but stops writing once s is full.
+func (s *Sequence) Write(p []byte) (n int, err error) {
+	// Local buffer buf is used as the underlying array for long strings that can
+	// cause heap allocation. We can take slices from this buffer to iteratively
+	// build a desired string (via append builtin)
+
 	if s == nil {
 		return 0, ErrReceiver("cannot Write to nil receiver")
 	}
-	if a == nil {
+	if p == nil {
 		return 0, ErrArgument("cannot Write from nil buffer")
 	}
-	n = copy(s.Byte[0:], a)
-	for i := range s.Byte[n:s.Len()] {
-		s.Byte[i] = 0 // Reset any trailing bytes.
+	n = copy(s.Reset().Byte[0:], p)
+	s.tail.Set(uint32(n))
+	if np := len(p); n < np {
+		err = ErrOverflow("cannot Write entire buffer (truncated)")
 	}
-	s.size.Set(uint32(n))
-	if c := len(a); n < c {
-		err = ErrOverflow("limited Write to " + ascii.Utoa(uint32(n)) +
-			" of " + ascii.Utoa(uint32(c)) + " total bytes")
+	return
+}
+
+// Append copies up to len(p) bytes from p to the end of s and returns the
+// number of bytes copied.
+//
+// Unlike the append builtin, it does not extend the length of s to make room
+// for all of p. It will only write to the free space in s and then return
+// ErrOverflow if all of p could not be copied.
+func (s *Sequence) Append(p []byte) (n int, err error) {
+	if s == nil {
+		return 0, ErrReceiver("cannot Append to nil receiver")
+	}
+	if p == nil {
+		return 0, ErrArgument("cannot Append from nil buffer")
+	}
+	np := len(p)
+	if np == 0 {
+		return
+	}
+	if s.Len() == 0 {
+		n = copy(s.Reset().Byte[0:], p)
+		s.tail.Set(uint32(n))
+	} else {
+		h, t := s.head.Get(), s.tail.Get()
+		for _, b := range p {
+			if t-h >= sys.BytesPerSequence {
+				break
+			}
+			s.Byte[t%sys.BytesPerSequence] = b
+			t++
+			n++
+		}
+		s.tail.Set(t)
+	}
+	if n < np {
+		err = ErrOverflow("cannot Append entire buffer (truncated)")
 	}
 	return
 }

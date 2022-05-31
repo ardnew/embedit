@@ -1,184 +1,92 @@
 package history
 
 import (
-	"reflect"
 	"testing"
 
-	"github.com/ardnew/embedit/limit"
-	"github.com/ardnew/embedit/line"
-	"github.com/ardnew/embedit/volatile"
+	"github.com/google/go-cmp/cmp"
+
+	"github.com/ardnew/embedit/terminal/line"
 )
 
 func TestHistory_Configure(t *testing.T) {
-	type fields struct {
-		line  [limit.LinesPerHistory]line.Line
-		head  volatile.Register32
-		size  volatile.Register32
-		indx  volatile.Register32
-		pend  line.Line
-		valid bool
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   *History
+	t.Parallel()
+	for name, tt := range map[string]struct {
+		h    *History
+		want *History
 	}{
 		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := &History{
-				line:  tt.fields.line,
-				head:  tt.fields.head,
-				size:  tt.fields.size,
-				indx:  tt.fields.indx,
-				pend:  tt.fields.pend,
-				valid: tt.fields.valid,
-			}
-			if got := h.Configure(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("History.Configure() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestHistory_init(t *testing.T) {
-	type fields struct {
-		line  [limit.LinesPerHistory]line.Line
-		head  volatile.Register32
-		size  volatile.Register32
-		indx  volatile.Register32
-		pend  line.Line
-		valid bool
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   *History
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := &History{
-				line:  tt.fields.line,
-				head:  tt.fields.head,
-				size:  tt.fields.size,
-				indx:  tt.fields.indx,
-				pend:  tt.fields.pend,
-				valid: tt.fields.valid,
-			}
-			if got := h.init(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("History.init() = %v, want %v", got, tt.want)
+		"": {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if diff := cmp.Diff(tt.want, tt.h.Configure(nil, nil)); len(diff) > 0 {
+				t.Errorf("diff (-want +got):%s\n", diff)
 			}
 		})
 	}
 }
 
 func TestHistory_Len(t *testing.T) {
-	type fields struct {
-		line  [limit.LinesPerHistory]line.Line
-		head  volatile.Register32
-		size  volatile.Register32
-		indx  volatile.Register32
-		pend  line.Line
-		valid bool
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   int
+	t.Parallel()
+	for name, tt := range map[string]struct {
+		h    *History
+		want int
 	}{
 		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := &History{
-				line:  tt.fields.line,
-				head:  tt.fields.head,
-				size:  tt.fields.size,
-				indx:  tt.fields.indx,
-				pend:  tt.fields.pend,
-				valid: tt.fields.valid,
-			}
-			if got := h.Len(); got != tt.want {
-				t.Errorf("History.Len() = %v, want %v", got, tt.want)
+		"": {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if diff := cmp.Diff(tt.want, tt.h.Len()); len(diff) > 0 {
+				t.Errorf("diff (-want +got):%s\n", diff)
 			}
 		})
 	}
 }
 
 func TestHistory_Add(t *testing.T) {
-	type fields struct {
-		line  [limit.LinesPerHistory]line.Line
-		head  volatile.Register32
-		size  volatile.Register32
-		indx  volatile.Register32
-		pend  line.Line
-		valid bool
-	}
-	type args struct {
-		ln line.Line
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
+	t.Parallel()
+	for name, tt := range map[string]struct {
+		h    *History
+		args struct {
+			ln line.Line
+		}
+		want *History
 	}{
 		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := &History{
-				line:  tt.fields.line,
-				head:  tt.fields.head,
-				size:  tt.fields.size,
-				indx:  tt.fields.indx,
-				pend:  tt.fields.pend,
-				valid: tt.fields.valid,
+		"": {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			tt.h.Add(tt.args.ln)
+			if diff := cmp.Diff(tt.want, tt.h); len(diff) > 0 {
+				t.Errorf("dirr (-want +got):%s\n", diff)
 			}
-			h.Add(tt.args.ln)
 		})
 	}
 }
 
 func TestHistory_Get(t *testing.T) {
-	type fields struct {
-		line  [limit.LinesPerHistory]line.Line
-		head  volatile.Register32
-		size  volatile.Register32
-		indx  volatile.Register32
-		pend  line.Line
-		valid bool
-	}
-	type args struct {
-		n int
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
+	t.Parallel()
+	for name, tt := range map[string]struct {
+		h    *History
+		args struct {
+			n int
+		}
 		wantLn line.Line
 		wantOk bool
 	}{
 		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := &History{
-				line:  tt.fields.line,
-				head:  tt.fields.head,
-				size:  tt.fields.size,
-				indx:  tt.fields.indx,
-				pend:  tt.fields.pend,
-				valid: tt.fields.valid,
+		"": {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			gotLn, gotOk := tt.h.Get(tt.args.n)
+			if diff := cmp.Diff(tt.wantLn, gotLn); len(diff) > 0 {
+				t.Errorf("diff (-want +got):%s\n", diff)
 			}
-			gotLn, gotOk := h.Get(tt.args.n)
-			if !reflect.DeepEqual(gotLn, tt.wantLn) {
-				t.Errorf("History.Get() gotLn = %v, want %v", gotLn, tt.wantLn)
-			}
-			if gotOk != tt.wantOk {
-				t.Errorf("History.Get() gotOk = %v, want %v", gotOk, tt.wantOk)
+			if diff := cmp.Diff(tt.wantOk, gotOk); len(diff) > 0 {
+				t.Errorf("diff (-want +got):%s\n", diff)
 			}
 		})
 	}

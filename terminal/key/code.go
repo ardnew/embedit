@@ -63,7 +63,10 @@ const (
 )
 
 // CRLF is the output line delimiter
-const CRLF = "\r\n"
+const (
+	CRLF  = "\r\n"
+	Blank = " "
+)
 
 // ANSI control sequences
 const (
@@ -182,4 +185,21 @@ func Parse(b []byte, pasting bool) (rune, []byte) {
 // IsPrintable returns true iff key is a visible, non-whitespace key.
 func IsPrintable(key rune) bool {
 	return key >= Space && (key < Unknown || surrogateMask < key)
+}
+
+// VisibleLen returns the number of visible glyphs in s.
+func VisibleLen(s []rune) int {
+	escape := false
+	length := 0
+	for _, r := range s {
+		switch {
+		case escape:
+			escape = (r < 'a' || 'z' < r) && (r < 'A' || 'Z' < r)
+		case r == Escape:
+			escape = true
+		default:
+			length++
+		}
+	}
+	return length
 }
