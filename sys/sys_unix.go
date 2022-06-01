@@ -1,14 +1,14 @@
 //go:build linux || darwin || freebsd
 // +build linux darwin freebsd
 
-package sysio
+package sys
 
 import (
-	"github.com/ardnew/embedit/sysio/sys"
+	"github.com/ardnew/embedit/sys/unix"
 )
 
 type fdio struct {
-	termios sys.Termios
+	termios unix.Termios
 }
 
 func makeFdio(fd int) Fdio {
@@ -18,12 +18,12 @@ func makeFdio(fd int) Fdio {
 }
 
 func (f *Fdio) read() (ok bool) {
-	f.termios, ok = sys.GetTermios(f.fd)
+	f.termios, ok = unix.GetTermios(f.fd)
 	return
 }
 
-func (f *Fdio) write(ts sys.Termios) bool {
-	return sys.SetTermios(f.fd, ts)
+func (f *Fdio) write(ts unix.Termios) bool {
+	return unix.SetTermios(f.fd, ts)
 }
 
 func (f *Fdio) raw() bool {

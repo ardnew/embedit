@@ -1,4 +1,4 @@
-package sysio
+package sys
 
 // Fdio contains the state of a terminal connected to a file descriptor.
 type Fdio struct {

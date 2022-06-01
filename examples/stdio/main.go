@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/ardnew/embedit"
-	"github.com/ardnew/embedit/sysio"
+	"github.com/ardnew/embedit/sys"
 )
 
 // Static storage for our main object.
@@ -21,7 +21,7 @@ var rw = &struct {
 func main() {
 	em.Configure(embedit.Config{RW: rw, Width: 80, Height: 24})
 
-	f := sysio.MakeFdio(int(os.Stdin.Fd()))
+	f := sys.MakeFdio(int(os.Stdin.Fd()))
 	if !f.Valid() || !f.Raw() {
 		return
 	}
@@ -34,9 +34,4 @@ func main() {
 	em.Line().Cursor().Move(2, 0, 0, 10)
 
 	profile()
-}
-
-type stdio struct {
-	io.Reader
-	io.Writer
 }
