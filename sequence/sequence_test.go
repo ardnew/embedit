@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ardnew/embedit/sys"
+	"github.com/ardnew/embedit/config"
 	"github.com/ardnew/embedit/volatile"
 )
 
@@ -42,13 +42,13 @@ func TestSequence_Append(t *testing.T) {
 			err:  false,
 		}, {
 			name: "full-seq",
-			seq:  &Sequence{tail: volatile.Register32{Reg: sys.BytesPerSequence}, valid: true},
+			seq:  &Sequence{tail: volatile.Register32{Reg: config.BytesPerSequence}, valid: true},
 			args: []byte{1, 2, 3, 4, 5},
 			want: []byte{1, 2, 3, 4, 5},
 			err:  true,
 		}, {
 			name: "part-seq",
-			seq:  &Sequence{tail: volatile.Register32{Reg: sys.BytesPerSequence - 3}, valid: true},
+			seq:  &Sequence{tail: volatile.Register32{Reg: config.BytesPerSequence - 3}, valid: true},
 			args: []byte{1, 2, 3, 4, 5},
 			want: []byte{4, 5},
 			err:  true,

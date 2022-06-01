@@ -1,4 +1,4 @@
-package sys
+package config
 
 const (
 	// DefaultPrompt defines the default user input prompt.

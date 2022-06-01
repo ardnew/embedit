@@ -22,9 +22,9 @@ type (
 // Refer to the examples to see how to allocate and configure the object for
 // common use cases.
 type Embedit struct {
-	term  terminal.Terminal
 	hist  history.History
-	valid bool // Has init been called
+	term  terminal.Terminal
+	valid bool
 }
 
 // Config defines the configuration parameters of an Embedit.

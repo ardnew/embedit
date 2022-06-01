@@ -3,7 +3,7 @@ package sequence
 import (
 	"io"
 
-	"github.com/ardnew/embedit/sys"
+	"github.com/ardnew/embedit/config"
 	"github.com/ardnew/embedit/volatile"
 )
 
@@ -16,7 +16,7 @@ type (
 
 // Sequence defines an I/O buffer for Terminal control/data byte sequences.
 type Sequence struct {
-	Byte  [sys.BytesPerSequence]byte
+	Byte  [config.BytesPerSequence]byte
 	head  volatile.Register32
 	tail  volatile.Register32
 	valid bool
@@ -74,7 +74,7 @@ func (s *Sequence) Read(p []byte) (n int, err error) {
 	}
 	h := s.head.Get()
 	for i := range p[:n] {
-		p[i] = s.Byte[h%sys.BytesPerSequence]
+		p[i] = s.Byte[h%config.BytesPerSequence]
 		h++
 	}
 	if err == io.EOF {
@@ -131,10 +131,10 @@ func (s *Sequence) Append(p []byte) (n int, err error) {
 	} else {
 		h, t := s.head.Get(), s.tail.Get()
 		for _, b := range p {
-			if t-h >= sys.BytesPerSequence {
+			if t-h >= config.BytesPerSequence {
 				break
 			}
-			s.Byte[t%sys.BytesPerSequence] = b
+			s.Byte[t%config.BytesPerSequence] = b
 			t++
 			n++
 		}

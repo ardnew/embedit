@@ -1,7 +1,7 @@
 package history
 
 import (
-	"github.com/ardnew/embedit/sys"
+	"github.com/ardnew/embedit/config"
 	"github.com/ardnew/embedit/terminal/display"
 	"github.com/ardnew/embedit/terminal/line"
 	"github.com/ardnew/embedit/terminal/wire"
@@ -10,7 +10,7 @@ import (
 
 // History contains previous user-input Lines.
 type History struct {
-	line  [sys.LinesPerHistory]line.Line
+	line  [config.LinesPerHistory]line.Line
 	pend  line.Line
 	head  volatile.Register32
 	size  volatile.Register32
@@ -54,10 +54,10 @@ func (h *History) Add(ln line.Line) {
 	if h == nil {
 		return
 	}
-	head := (h.head.Get() + 1) % sys.LinesPerHistory
+	head := (h.head.Get() + 1) % config.LinesPerHistory
 	h.head.Set(head)
 	h.line[head] = ln
-	if size := h.size.Get(); size < sys.LinesPerHistory {
+	if size := h.size.Get(); size < config.LinesPerHistory {
 		h.size.Set(size + 1)
 	}
 }
@@ -72,7 +72,7 @@ func (h *History) Get(n int) (ln line.Line, ok bool) {
 	}
 	index := int(h.head.Get()) - n
 	if index < 0 {
-		index += sys.LinesPerHistory
+		index += config.LinesPerHistory
 	}
 	return h.line[index], true
 }

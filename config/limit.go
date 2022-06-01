@@ -1,4 +1,4 @@
-package sys
+package config
 
 const (
 	// RunesPerLine defines the maximum number of runes in a line of input.

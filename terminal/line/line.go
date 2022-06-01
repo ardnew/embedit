@@ -3,7 +3,7 @@ package line
 import (
 	"io"
 
-	"github.com/ardnew/embedit/sys"
+	"github.com/ardnew/embedit/config"
 	"github.com/ardnew/embedit/terminal/display"
 	"github.com/ardnew/embedit/terminal/key"
 	"github.com/ardnew/embedit/terminal/line/cursor"
@@ -20,12 +20,12 @@ type (
 
 // Line represents a single line of input.
 type Line struct {
-	Rune  [sys.RunesPerLine]rune
 	curs  cursor.Cursor
-	posi  volatile.Register32 // Logical position of Cursor.
+	Rune  [config.RunesPerLine]rune
+	posi  volatile.Register32
 	head  volatile.Register32
 	tail  volatile.Register32
-	valid bool // Has init been called
+	valid bool
 }
 
 // Invalid represents an invalid Line.
@@ -69,8 +69,8 @@ func (l *Line) Reset() *Line {
 
 func (l *Line) String() string {
 	if l != nil && l.valid {
-		ih := l.head.Get() % sys.RunesPerLine
-		it := l.tail.Get() % sys.RunesPerLine
+		ih := l.head.Get() % config.RunesPerLine
+		it := l.tail.Get() % config.RunesPerLine
 		if ih > it {
 			return string(l.Rune[ih:]) + string(l.Rune[:it])
 		}
@@ -144,7 +144,7 @@ func (l *Line) Read(p []byte) (n int, err error) {
 	}
 	h, i := l.head.Get(), 0
 	for i < n {
-		ih := h % sys.RunesPerLine
+		ih := h % config.RunesPerLine
 		i += copy(p[i:], []byte(string(l.Rune[ih:ih+1])))
 		h++
 	}
@@ -199,11 +199,11 @@ func (l *Line) Append(p []byte) (n int, err error) {
 		n = np
 		h, t := l.head.Get(), l.tail.Get()
 		for i, c := range string(p) {
-			if t-h >= sys.RunesPerLine {
+			if t-h >= config.RunesPerLine {
 				n = i
 				break
 			}
-			l.Rune[t%sys.RunesPerLine] = c
+			l.Rune[t%config.RunesPerLine] = c
 			t++
 		}
 		l.tail.Set(t)

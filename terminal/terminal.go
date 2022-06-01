@@ -3,8 +3,8 @@ package terminal
 import (
 	"io"
 
+	"github.com/ardnew/embedit/config"
 	"github.com/ardnew/embedit/sequence"
-	"github.com/ardnew/embedit/sys"
 	"github.com/ardnew/embedit/terminal/line"
 	"github.com/ardnew/embedit/volatile"
 )
@@ -14,10 +14,10 @@ import (
 // The rw field abstracts how input/output is implemented by the host.
 type Terminal struct {
 	rw     io.ReadWriter
-	i      sequence.Sequence // Input byte buffer
-	o      sequence.Sequence // Output byte buffer
-	line   line.Line
 	prompt []rune
+	line   line.Line
+	i      sequence.Sequence
+	o      sequence.Sequence
 	width  volatile.Register32
 	height volatile.Register32
 	valid  bool
@@ -40,7 +40,7 @@ func (t *Terminal) Configure(rw io.ReadWriter, prompt []rune, width, height int)
 func (t *Terminal) init() *Terminal {
 	t.valid = true
 	if t.prompt == nil {
-		t.prompt = []rune(sys.DefaultPrompt)
+		t.prompt = []rune(config.DefaultPrompt)
 	}
 	return t
 }
@@ -59,10 +59,10 @@ func (t *Terminal) Size() (width, height int) {
 // SetSize sets the Terminal width and height.
 func (t *Terminal) SetSize(width, height int) {
 	if width <= 0 {
-		width = sys.DefaultWidth
+		width = config.DefaultWidth
 	}
 	if height <= 0 {
-		height = sys.DefaultHeight
+		height = config.DefaultHeight
 	}
 	t.width.Set(uint32(width))
 	t.height.Set(uint32(height))
@@ -84,7 +84,7 @@ func (t *Terminal) Line() *line.Line {
 // Prompt returns the user input prompt.
 func (t *Terminal) Prompt() []rune {
 	if t.prompt == nil {
-		return []rune(sys.DefaultPrompt)
+		return []rune(config.DefaultPrompt)
 	}
 	return t.prompt
 }
