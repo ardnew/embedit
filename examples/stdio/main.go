@@ -1,9 +1,9 @@
 package main
 
 import (
+	"errors"
 	"io"
 	"os"
-	"time"
 
 	"github.com/ardnew/embedit"
 	"github.com/ardnew/embedit/sys"
@@ -18,20 +18,31 @@ var rw = &struct {
 	io.Writer
 }{os.Stdin, os.Stdout}
 
+type mainFunc func() error
+
 func main() {
+	if err := run(app); err != nil {
+		os.Stderr.Write([]byte(err.Error()))
+		os.Stderr.Write([]byte{'\n'})
+	}
+}
+
+func app() error {
 	em.Configure(embedit.Config{RW: rw, Width: 80, Height: 24})
 
 	f := sys.MakeFdio(int(os.Stdin.Fd()))
 	if !f.Valid() || !f.Raw() {
-		return
+		return errors.New("cannot attach terminal to stdin")
 	}
 	defer f.Restore()
 
-	em.Line().Set([]rune("hello there"), 5)
-	time.Sleep(1 * time.Second)
-	em.Line().Cursor().Move(0, 2, 0, 0)
-	time.Sleep(1 * time.Second)
-	em.Line().Cursor().Move(2, 0, 0, 10)
+	for i := 0; i < 100; i++ {
+		em.Line().Set([]rune("hello there"), 5)
+		// time.Sleep(1 * time.Second)
+		em.Line().Cursor().Move(0, 2, 0, 0)
+		// time.Sleep(1 * time.Second)
+		em.Line().Cursor().Move(2, 0, 0, 10)
+	}
 
-	profile()
+	return nil
 }

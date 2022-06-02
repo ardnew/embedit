@@ -84,26 +84,26 @@ func (l *Line) Set(s []rune, pos int) (err error) {
 	if l == nil {
 		return ErrReceiver("cannot Set with nil receiver")
 	}
-	e := []error{}
-	// Always attempt to perform all operations, and save any errors returned
-	// along the way. Once we've finished, we return the first non-nil error
-	// that was added to the slice.
 	if l.curs.Echo() {
-		e = append(e, l.curs.MoveTo(0))
-		e = append(e, l.curs.WriteLine(s))
+		if e := l.curs.MoveTo(0); e != nil {
+			err = e
+		}
+		if e := l.curs.WriteLine(s); e != nil && err == nil {
+			err = e
+		}
 		for i := len(s); i < l.Len(); i++ {
-			e = append(e, l.curs.WriteLine([]rune(key.Blank)))
+			if e := l.curs.WriteLine([]rune(key.Blank)); e != nil && err == nil {
+				err = e
+			}
 		}
-		e = append(e, l.curs.MoveTo(pos))
+		if e := l.curs.MoveTo(pos); e != nil && err == nil {
+			err = e
+		}
 	}
-	_, ew := l.Write([]byte(string(s)))
+	if _, e := l.Write([]byte(string(s))); e != nil && err == nil {
+		err = e
+	}
 	l.SetPos(pos)
-	// Check if any of the appended errors are non-nil. Return the first, if any.
-	for _, err = range append(e, ew) {
-		if err != nil {
-			return
-		}
-	}
 	return
 }
 
