@@ -1,7 +1,9 @@
 package line
 
 import (
+	"bytes"
 	"io"
+	"unicode/utf8"
 
 	"github.com/ardnew/embedit/config"
 	"github.com/ardnew/embedit/terminal/display"
@@ -48,11 +50,16 @@ func (l *Line) init() *Line {
 }
 
 // Len returns the number of bytes in l.
-func (l *Line) Len() int {
+func (l *Line) Len() (n int) {
 	if l == nil {
 		return 0
 	}
-	return len(l.String())
+	ih := l.head.Get() % config.RunesPerLine
+	it := l.tail.Get() % config.RunesPerLine
+	if ih > it {
+		return runesLen(l.Rune[ih:]) + runesLen(l.Rune[:it])
+	}
+	return runesLen(l.Rune[ih:it])
 }
 
 // Reset sets the Line length to 0 and resets the cursor position.
@@ -67,17 +74,17 @@ func (l *Line) Reset() *Line {
 	return l
 }
 
-func (l *Line) String() string {
-	if l != nil && l.valid {
-		ih := l.head.Get() % config.RunesPerLine
-		it := l.tail.Get() % config.RunesPerLine
-		if ih > it {
-			return string(l.Rune[ih:]) + string(l.Rune[:it])
-		}
-		return string(l.Rune[ih:it])
-	}
-	return ""
-}
+// func (l *Line) String() string {
+// 	if l != nil && l.valid {
+// 		ih := l.head.Get() % config.RunesPerLine
+// 		it := l.tail.Get() % config.RunesPerLine
+// 		if ih > it {
+// 			return string(l.Rune[ih:]) + string(l.Rune[:it])
+// 		}
+// 		return string(l.Rune[ih:it])
+// 	}
+// 	return ""
+// }
 
 // Set overwrites the bytes in l and sets its Cursor's logical position.
 func (l *Line) Set(s []rune, pos int) (err error) {
@@ -107,7 +114,7 @@ func (l *Line) Set(s []rune, pos int) (err error) {
 	return
 }
 
-// Pos returns the logical position of the Cursor within l.
+// Cursor returns a reference to the Cursor.
 func (l *Line) Cursor() *cursor.Cursor {
 	if l == nil {
 		return nil
@@ -117,11 +124,17 @@ func (l *Line) Cursor() *cursor.Cursor {
 
 // Pos returns the logical position of the Cursor within l.
 func (l *Line) Pos() int {
+	if l == nil {
+		return 0
+	}
 	return int(l.posi.Get())
 }
 
-// Pos returns the logical position of the Cursor within l.
+// SetPos sets the logical position of the Cursor within l.
 func (l *Line) SetPos(pos int) {
+	if l == nil {
+		return
+	}
 	if pos < 0 {
 		pos = 0
 	}
@@ -135,7 +148,7 @@ func (l *Line) Read(p []byte) (n int, err error) {
 		return 0, ErrReceiver("cannot Read from nil receiver")
 	}
 	if p == nil {
-		return 0, ErrArgument("cannot Read to nil buffer")
+		return 0, ErrArgument("cannot Read into nil buffer")
 	}
 	var nl int
 	nl, n = l.Len(), len(p)
@@ -145,7 +158,7 @@ func (l *Line) Read(p []byte) (n int, err error) {
 	h, i := l.head.Get(), 0
 	for i < n {
 		ih := h % config.RunesPerLine
-		i += copy(p[i:], []byte(string(l.Rune[ih:ih+1])))
+		i += utf8.EncodeRune(p[i:], l.Rune[ih])
 		h++
 	}
 	if err == io.EOF {
@@ -162,15 +175,35 @@ func (l *Line) Read(p []byte) (n int, err error) {
 // Write overwrites any bytes present, but stops writing once l is full.
 func (l *Line) Write(p []byte) (n int, err error) {
 	if l == nil {
-		return 0, ErrReceiver("cannot Write to nil receiver")
+		return 0, ErrReceiver("cannot Write into nil receiver")
 	}
 	if p == nil {
 		return 0, ErrArgument("cannot Write from nil buffer")
 	}
-	n = copy([]byte(string(l.Reset().Rune[0:])), p)
-	l.tail.Set(uint32(n))
-	if np := len(p); n < np {
-		err = ErrOverflow("cannot Write entire buffer (truncated)")
+	np := len(p)
+	if np == 0 {
+		return
+	}
+	_ = l.Reset()
+	var t uint32
+	r := bytes.NewReader(p)
+	for r.Len() > 0 {
+		if t > config.RunesPerLine {
+			break
+		}
+		cu, nu, erru := r.ReadRune()
+		if erru != nil {
+			// Skip invalid rune, but continue copying remaining bytes.
+			err = erru
+			continue
+		}
+		l.Rune[t] = cu
+		n += nu
+		t++
+	}
+	l.tail.Set(t)
+	if r.Len() > 0 {
+		err = ErrOverflow("cannot Write entire buffer (short write)")
 	}
 	return
 }
@@ -183,7 +216,7 @@ func (l *Line) Write(p []byte) (n int, err error) {
 // ErrOverflow if all of p could not be copied.
 func (l *Line) Append(p []byte) (n int, err error) {
 	if l == nil {
-		return 0, ErrReceiver("cannot Append to nil receiver")
+		return 0, ErrReceiver("cannot Append into nil receiver")
 	}
 	if p == nil {
 		return 0, ErrArgument("cannot Append from nil buffer")
@@ -192,24 +225,25 @@ func (l *Line) Append(p []byte) (n int, err error) {
 	if np == 0 {
 		return
 	}
-	if l.Len() == 0 {
-		n = copy([]byte(string(l.Reset().Rune[0:])), p)
-		l.tail.Set(uint32(n))
-	} else {
-		n = np
-		h, t := l.head.Get(), l.tail.Get()
-		for i, c := range string(p) {
-			if t-h >= config.RunesPerLine {
-				n = i
-				break
-			}
-			l.Rune[t%config.RunesPerLine] = c
-			t++
+	h, t := l.head.Get(), l.tail.Get()
+	r := bytes.NewReader(p)
+	for r.Len() > 0 {
+		if t-h >= config.RunesPerLine {
+			break
 		}
-		l.tail.Set(t)
+		cu, nu, erru := r.ReadRune()
+		if erru != nil {
+			// Skip invalid rune, but continue copying remaining bytes.
+			err = erru
+			continue
+		}
+		l.Rune[t%config.RunesPerLine] = cu
+		n += nu
+		t++
 	}
-	if n < np {
-		err = ErrOverflow("cannot Append entire buffer (truncated)")
+	l.tail.Set(t)
+	if r.Len() > 0 {
+		err = ErrOverflow("cannot Append entire buffer (short write)")
 	}
 	return
 }
@@ -217,3 +251,11 @@ func (l *Line) Append(p []byte) (n int, err error) {
 func (e ErrReceiver) Error() string { return "line [receiver]: " + string(e) }
 func (e ErrArgument) Error() string { return "line [argument]: " + string(e) }
 func (e ErrOverflow) Error() string { return "line [overflow]: " + string(e) }
+
+// runesLen returns the number of bytes in p.
+func runesLen(p []rune) (n int) {
+	for _, r := range p {
+		n += utf8.RuneLen(r)
+	}
+	return
+}

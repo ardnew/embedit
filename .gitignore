@@ -1,5 +1,8 @@
-**/build/
 **/*.dSYM
 /*.out
+/*.elf
+/*.bin
 /*.png
+mem.pro
+cpu.pro
 go.sum

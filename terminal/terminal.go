@@ -20,8 +20,6 @@ type Terminal struct {
 	o      sequence.Sequence
 	width  volatile.Register32
 	height volatile.Register32
-	r      [64]byte
-	w      [64]byte
 	valid  bool
 }
 
@@ -93,32 +91,26 @@ func (t *Terminal) Prompt() []rune {
 
 // Read copies up to len(p) bytes from the receiver's input buffer to p.
 func (t *Terminal) Read(p []byte) (n int, err error) {
+	// i, err := io.Copy(bytes.NewBuffer(p), &t.i)
+	// return int(i), err
 	return t.i.Read(p)
 }
 
 // ReadWire copies bytes from an input device to the receiver's input buffer.
 func (t *Terminal) ReadWire() (n int, err error) {
-	// i, err := io.Copy(&t.i, t.rw)
-	// return int(i), err
-	for {
-		r, err := t.rw.Read(t.i.Byte[n:])
-		if n += r; r == 0 || err != nil {
-			return n, err
-		}
-	}
+	i, err := io.Copy(&t.i, t.rw)
+	return int(i), err
 }
 
 // Write copies up to len(p) bytes from p to the receiver's output buffer.
 func (t *Terminal) Write(p []byte) (n int, err error) {
+	// i, err := io.Copy(&t.o, bytes.NewReader(p))
+	// return int(i), err
 	return t.o.Append(p)
 }
 
 // WriteWire copies bytes from the receiver's output buffer to an output device.
 func (t *Terminal) WriteWire() (n int, err error) {
-	for {
-		w, err := t.rw.Write(t.o.Byte[n:])
-		if n += w; w == 0 || err != nil {
-			return n, err
-		}
-	}
+	i, err := io.Copy(t.rw, &t.o)
+	return int(i), err
 }

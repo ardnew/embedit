@@ -36,7 +36,7 @@ func app() error {
 	}
 	defer f.Restore()
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 10000; i++ {
 		em.Line().Set([]rune("hello there"), 5)
 		// time.Sleep(1 * time.Second)
 		em.Line().Cursor().Move(0, 2, 0, 0)

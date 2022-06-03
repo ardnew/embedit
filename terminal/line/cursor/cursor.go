@@ -1,6 +1,8 @@
 package cursor
 
 import (
+	"bytes"
+
 	"github.com/ardnew/embedit/terminal/display"
 	"github.com/ardnew/embedit/terminal/key"
 	"github.com/ardnew/embedit/terminal/wire"
@@ -83,6 +85,7 @@ func (c *Cursor) WriteLine(line []rune) (err error) {
 			todo = free
 		}
 		buff := []byte(string(line[:todo]))
+		// buff := bytes.NewReader(line[:todo])
 		var n int
 		n, err = c.wire.Write(buff)
 		sent := []rune(string(buff[:n]))
@@ -211,7 +214,7 @@ func (c *Cursor) Advance(places int) (err error) {
 	// So, if we are stopping at the end of a line, we need to write a newline so
 	// that our cursor can be advanced to the next line.
 	if places > 0 && x == 0 {
-		_, err = c.wire.Write([]byte(key.CRLF))
+		_, err = c.wire.Write(bytes.NewBufferString(key.CRLF).Bytes())
 	}
 	return
 }

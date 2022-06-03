@@ -1,6 +1,7 @@
 package key
 
 import (
+	"bytes"
 	"unicode/utf8"
 )
 
@@ -76,20 +77,6 @@ const (
 	erase      = ` ` + csi + `D`
 )
 
-// hasPrefix returns true iff b[:len(prefix)] == prefix[:]
-func hasPrefix(b, prefix []byte) bool {
-	n := len(prefix)
-	if len(b) < n {
-		return false
-	}
-	for i := 0; i < n; i++ {
-		if b[i] != prefix[i] {
-			return false
-		}
-	}
-	return true
-}
-
 // Parse tries to parse a key sequence from b.
 // If successful, it returns the key and the remainder of b.
 // Otherwise, it returns utf8.RuneError.
@@ -133,9 +120,9 @@ func Parse(b []byte, pasting bool) (rune, []byte) {
 		return r, b[l:]
 	}
 
-	if hasPrefix(b, []byte(csi)) {
+	if bytes.HasPrefix(b, bytes.NewBufferString(csi).Bytes()) {
 		if pasting {
-			if hasPrefix(b, []byte(pasteEnd)) {
+			if bytes.HasPrefix(b, bytes.NewBufferString(pasteEnd).Bytes()) {
 				return PasteEnd, b[len(pasteEnd):]
 			}
 		} else {
@@ -163,7 +150,7 @@ func Parse(b []byte, pasting bool) (rune, []byte) {
 					}
 				}
 			}
-			if hasPrefix(b, []byte(pasteStart)) {
+			if bytes.HasPrefix(b, bytes.NewBufferString(pasteStart).Bytes()) {
 				return PasteStart, b[len(pasteStart):]
 			}
 		}
