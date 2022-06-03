@@ -3,6 +3,6 @@
 /*.elf
 /*.bin
 /*.png
-mem.pro
-cpu.pro
+*.profile
+*.trace
 go.sum

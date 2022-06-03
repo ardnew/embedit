@@ -2,11 +2,13 @@ package cursor
 
 import (
 	"bytes"
+	"io"
 
 	"github.com/ardnew/embedit/terminal/display"
 	"github.com/ardnew/embedit/terminal/key"
 	"github.com/ardnew/embedit/terminal/wire"
 	"github.com/ardnew/embedit/text/ascii"
+	"github.com/ardnew/embedit/text/utf8"
 	"github.com/ardnew/embedit/volatile"
 )
 
@@ -84,19 +86,22 @@ func (c *Cursor) WriteLine(line []rune) (err error) {
 		if todo > free {
 			todo = free
 		}
-		buff := []byte(string(line[:todo]))
-		// buff := bytes.NewReader(line[:todo])
 		var n int
-		n, err = c.wire.Write(buff)
-		sent := []rune(string(buff[:n]))
-		aerr := c.Advance(key.VisibleLen(sent))
+		for _, r := range line[:todo] {
+			nc, errc := io.Copy(c.wire, utf8.Rune(r))
+			if errc != nil {
+				continue
+			}
+			n += int(nc)
+		}
+		aerr := c.Advance(key.VisibleLen(line[:todo]))
 		if err == nil {
 			err = aerr
 		}
 		if err != nil {
 			return
 		}
-		line = line[len(sent):]
+		line = line[len(line[:todo]):]
 	}
 	return
 }
@@ -108,61 +113,54 @@ func (c *Cursor) WriteLine(line []rune) (err error) {
 func (c *Cursor) Move(up, down, left, right int) (err error) {
 	// 1 unit up can be expressed as ^[[A or ^[A
 	// 5 units up can be expressed as ^[[5A
-
 	// - - - - - - - - - - - - - - - - - - - -
 	// Up
-	b := []byte{}
 	if up == 1 {
-		b = append(b, key.Escape, '[', 'A')
+		c.wire.WriteByte(key.Escape)
+		c.wire.WriteByte('[')
+		c.wire.WriteByte('A')
 	} else if up > 1 {
-		b = append(b, key.Escape, '[')
-		b = append(b, ascii.Utoa(uint32(up))...)
-		b = append(b, 'A')
-	}
-	// Append to output buffer
-	if _, err = c.wire.Write(b); err != nil {
-		return
+		c.wire.WriteByte(key.Escape)
+		c.wire.WriteByte('[')
+		io.Copy(c.wire, ascii.Uint32(up))
+		c.wire.WriteByte('A')
 	}
 	// - - - - - - - - - - - - - - - - - - - -
 	// Down
-	b = []byte{}
 	if down == 1 {
-		b = append(b, key.Escape, '[', 'B')
+		c.wire.WriteByte(key.Escape)
+		c.wire.WriteByte('[')
+		c.wire.WriteByte('B')
 	} else if down > 1 {
-		b = append(b, key.Escape, '[')
-		b = append(b, ascii.Utoa(uint32(down))...)
-		b = append(b, 'B')
-	}
-	// Append to output buffer
-	if _, err = c.wire.Write(b); err != nil {
-		return
+		c.wire.WriteByte(key.Escape)
+		c.wire.WriteByte('[')
+		io.Copy(c.wire, ascii.Uint32(down))
+		c.wire.WriteByte('B')
 	}
 	// - - - - - - - - - - - - - - - - - - - -
 	// Right
-	b = []byte{}
 	if right == 1 {
-		b = append(b, key.Escape, '[', 'C')
+		c.wire.WriteByte(key.Escape)
+		c.wire.WriteByte('[')
+		c.wire.WriteByte('C')
 	} else if right > 1 {
-		b = append(b, key.Escape, '[')
-		b = append(b, ascii.Utoa(uint32(right))...)
-		b = append(b, 'C')
-	}
-	// Append to output buffer
-	if _, err = c.wire.Write(b); err != nil {
-		return
+		c.wire.WriteByte(key.Escape)
+		c.wire.WriteByte('[')
+		io.Copy(c.wire, ascii.Uint32(right))
+		c.wire.WriteByte('C')
 	}
 	// - - - - - - - - - - - - - - - - - - - -
 	// Left
-	b = []byte{}
 	if left == 1 {
-		b = append(b, key.Escape, '[', 'D')
+		c.wire.WriteByte(key.Escape)
+		c.wire.WriteByte('[')
+		c.wire.WriteByte('D')
 	} else if left > 1 {
-		b = append(b, key.Escape, '[')
-		b = append(b, ascii.Utoa(uint32(left))...)
-		b = append(b, 'D')
+		c.wire.WriteByte(key.Escape)
+		c.wire.WriteByte('[')
+		io.Copy(c.wire, ascii.Uint32(left))
+		c.wire.WriteByte('D')
 	}
-	// Append to output buffer
-	_, err = c.wire.Write(b)
 	c.wire.WriteWire()
 	return
 }

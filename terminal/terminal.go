@@ -96,6 +96,14 @@ func (t *Terminal) Read(p []byte) (n int, err error) {
 	return t.i.Read(p)
 }
 
+func (t *Terminal) ReadByte() (b byte, err error) {
+	return t.i.ReadByte()
+}
+
+func (t *Terminal) ReadFrom(r io.Reader) (n int64, err error) {
+	return t.o.ReadFrom(r)
+}
+
 // ReadWire copies bytes from an input device to the receiver's input buffer.
 func (t *Terminal) ReadWire() (n int, err error) {
 	i, err := io.Copy(&t.i, t.rw)
@@ -107,6 +115,14 @@ func (t *Terminal) Write(p []byte) (n int, err error) {
 	// i, err := io.Copy(&t.o, bytes.NewReader(p))
 	// return int(i), err
 	return t.o.Append(p)
+}
+
+func (t *Terminal) WriteByte(b byte) (err error) {
+	return t.o.WriteByte(b)
+}
+
+func (t *Terminal) WriteTo(w io.Writer) (n int64, err error) {
+	return t.i.WriteTo(w)
 }
 
 // WriteWire copies bytes from the receiver's output buffer to an output device.

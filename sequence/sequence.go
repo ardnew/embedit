@@ -293,11 +293,53 @@ func (s *Sequence) WriteTo(w io.Writer) (n int64, err error) {
 		// (2.) Copy from start of the backing array to tail.
 		n2, err2 := s.writeTo(w, 0, int(it))
 		return int64(n1 + n2), err2
-
 	}
 	// Elements form contiguous span in backing array from head to tail.
 	nw, errw := s.writeTo(w, int(ih), int(it))
 	return int64(nw), errw
+}
+
+func (s *Sequence) ReadByte() (b byte, err error) {
+	if s == nil {
+		return 0, ErrReceiver("cannot ReadByte from nil receiver")
+	}
+	h, t := s.head.Get(), s.tail.Get()
+	if t-h == 0 {
+		// Sequence is empty, reading zero bytes from s.
+		_ = s.Reset()
+		return 0, io.EOF
+	}
+	// Copy the byte in head position, and increment head by 1.
+	b = s.Byte[h%config.BytesPerSequence]
+	s.head.Set(h + 1)
+	return
+}
+
+func (s *Sequence) WriteByte(b byte) (err error) {
+	if s == nil {
+		return ErrReceiver("cannot WriteByte into nil receiver")
+	}
+	h, t := s.head.Get(), s.tail.Get()
+	if t-h == 0 {
+		// Sequence is empty, we know what the resulting head and tail will be.
+		s.Byte[0] = b
+		s.head.Set(0)
+		s.tail.Set(1)
+		return nil
+	}
+	it := t % config.BytesPerSequence
+	// If the array indices are equal, with head not eqaul to tail (see above),
+	// then the backing array is filled to capacity. We have nowhere to store the
+	// byte. We can either discard head or retain it and return an error. Opting
+	// for the latter so that no byte is lost, and it gives the caller an
+	// opportunity to handle the situation.
+	if it == h%config.BytesPerSequence {
+		return ErrOverflow("cannot WriteByte into full receiver")
+	}
+	// Write the byte into tail position and increment tail by 1.
+	s.Byte[it] = b
+	s.tail.Set(t + 1)
+	return nil
 }
 
 func (e ErrReceiver) Error() string { return "sequence [receiver]: " + string(e) }

@@ -4,21 +4,38 @@
 package main
 
 import (
+	"flag"
 	"os"
 	"runtime/trace"
 )
 
-func run(app mainFunc) (err error) {
+var flags = struct {
+	o string
+}{
+	o: pkgName + ".trace",
+}
+
+func run(fn mainFunc) (err error) {
+	if err = parseFlags(); err != nil {
+		return
+	}
 	var f *os.File
-	if f, err = os.Create("trace.out"); err != nil {
+	if f, err = os.Create(flags.o); err != nil {
 		return
 	}
 	defer func() { err = f.Close() }()
-
 	if err = trace.Start(f); err != nil {
 		return
 	}
 	defer trace.Stop()
+	return fn()
+}
 
-	return app()
+func parseFlags() (err error) {
+	fs := flag.NewFlagSet(pkgName, flag.ExitOnError)
+
+	fs.StringVar(&flags.o, "o", flags.o,
+		"Write output to `file`")
+
+	return fs.Parse(os.Args[1:])
 }

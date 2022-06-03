@@ -3,4 +3,4 @@
 
 package main
 
-func run(app mainFunc) error { return app() }
+func run(fn mainFunc) error { return fn() }
