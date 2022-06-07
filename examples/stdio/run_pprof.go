@@ -11,9 +11,13 @@ import (
 )
 
 var flags = struct {
-	o string
+	o string // output file
 }{
 	o: pkgName + ".profile",
+}
+
+func init() {
+	runtime.MemProfileRate = 1
 }
 
 func run(fn mainFunc) (err error) {
@@ -34,6 +38,12 @@ func run(fn mainFunc) (err error) {
 
 func parseFlags() (err error) {
 	fs := flag.NewFlagSet(pkgName, flag.ExitOnError)
+
+	fs.IntVar(&options.n, "n", options.n,
+		"Number of `iterations`")
+
+	fs.DurationVar(&options.t, "t", options.t,
+		"Wait `delay` between steps")
 
 	fs.StringVar(&flags.o, "o", flags.o,
 		"Write output to `file`")

@@ -63,18 +63,18 @@ const (
 	surrogateMask = Unknown | 0x03FF
 )
 
-// CRLF is the output line delimiter
-const (
-	CRLF  = "\r\n"
-	Blank = " "
+var (
+	// CRLF is the output line delimiter
+	CRLF  = []byte{'\r', '\n'}
+	Blank = []rune{' '}
 )
 
 // ANSI control sequences
-const (
-	csi        = string(rune(Escape)) + `[` // Extra rune cast to suppress warning
-	pasteStart = csi + `200~`
-	pasteEnd   = csi + `201~`
-	erase      = ` ` + csi + `D`
+var (
+	csi        = []byte{Escape, '['}
+	pasteStart = []byte{Escape, '[', '2', '0', '0', '~'}
+	pasteEnd   = []byte{Escape, '[', '2', '0', '1', '~'}
+	erase      = []byte{' ', Escape, '[', 'D'}
 )
 
 // Parse tries to parse a key sequence from b.
@@ -120,9 +120,9 @@ func Parse(b []byte, pasting bool) (rune, []byte) {
 		return r, b[l:]
 	}
 
-	if bytes.HasPrefix(b, bytes.NewBufferString(csi).Bytes()) {
+	if bytes.HasPrefix(b, csi) {
 		if pasting {
-			if bytes.HasPrefix(b, bytes.NewBufferString(pasteEnd).Bytes()) {
+			if bytes.HasPrefix(b, pasteEnd) {
 				return PasteEnd, b[len(pasteEnd):]
 			}
 		} else {
@@ -150,7 +150,7 @@ func Parse(b []byte, pasting bool) (rune, []byte) {
 					}
 				}
 			}
-			if bytes.HasPrefix(b, bytes.NewBufferString(pasteStart).Bytes()) {
+			if bytes.HasPrefix(b, pasteStart) {
 				return PasteStart, b[len(pasteStart):]
 			}
 		}

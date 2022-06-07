@@ -2,10 +2,11 @@ package ascii
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
-func TestAppendu(t *testing.T) {
+func TestWriteUint32(t *testing.T) {
 	buf := [][]byte{
 		nil,
 		make([]byte, 0),
@@ -39,12 +40,14 @@ func TestAppendu(t *testing.T) {
 		9,
 		^uint32(0),
 	} {
-		// for tt := uint32(0); tt < ^uint32(0); tt++ {
 		for _, tb := range buf {
 			s := fmt.Sprintf("%s%d", tb, tt)
 			t.Run(fmt.Sprintf("%#v,%d", tb, tt), func(t *testing.T) {
-				if got := Appu(tb, tt); got != s {
-					t.Fatalf("Utoa() = %v, want %v", got, s)
+				var sb strings.Builder
+				_, _ = sb.Write(tb)
+				_, _ = WriteUint32(&sb, tt)
+				if sb.String() != s {
+					t.Fatalf("Utoa() = %v, want %v", sb.String(), s)
 				}
 			})
 		}

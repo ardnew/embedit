@@ -2,9 +2,8 @@ package history
 
 import (
 	"github.com/ardnew/embedit/config"
-	"github.com/ardnew/embedit/terminal/display"
+	"github.com/ardnew/embedit/terminal/cursor"
 	"github.com/ardnew/embedit/terminal/line"
-	"github.com/ardnew/embedit/terminal/wire"
 	"github.com/ardnew/embedit/volatile"
 )
 
@@ -19,15 +18,15 @@ type History struct {
 }
 
 // Configure initializes the History configuration.
-func (h *History) Configure(disp display.Display, wire wire.ReadWriter) *History {
+func (h *History) Configure(curs *cursor.Cursor) *History {
 	if h == nil {
 		return nil
 	}
 	h.valid = false
 	for i := range h.line {
-		_ = h.line[i].Configure(disp, wire)
+		_ = h.line[i].Configure(curs)
 	}
-	h.pend.Configure(disp, wire)
+	h.pend.Configure(curs)
 	return h.init()
 }
 
@@ -66,13 +65,17 @@ func (h *History) Add(ln line.Line) {
 // If n=0, the immediately previous Line is returned; if n=1, the Line before
 // that, and so on.
 // If n<0 or fewer than n+1 lines have been added, ok is false.
-func (h *History) Get(n int) (ln line.Line, ok bool) {
+func (h *History) Get(n int) (ln *line.Line, ok bool) {
 	if h == nil || n < 0 || n >= int(h.size.Get()) {
-		return line.Invalid, false
+		return nil, false
 	}
 	index := int(h.head.Get()) - n
 	if index < 0 {
 		index += config.LinesPerHistory
 	}
-	return h.line[index], true
+	return &h.line[index], true
+}
+
+func (h *History) Line() *line.Line {
+	return &h.pend
 }

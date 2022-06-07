@@ -5,5 +5,8 @@ package volatile
 
 import "runtime/volatile"
 
-// Register32 is implemented in the TinyGo runtime package "runtime/volatile".
-type Register32 = volatile.Register32
+// Registers are implemented in the TinyGo runtime package "runtime/volatile".
+type (
+	Register8  = volatile.Register8
+	Register32 = volatile.Register32
+)

@@ -34,6 +34,12 @@ func run(fn mainFunc) (err error) {
 func parseFlags() (err error) {
 	fs := flag.NewFlagSet(pkgName, flag.ExitOnError)
 
+	fs.IntVar(&options.n, "n", options.n,
+		"Number of `iterations`")
+
+	fs.DurationVar(&options.t, "t", options.t,
+		"Wait `delay` between steps")
+
 	fs.StringVar(&flags.addr, "addr", flags.addr,
 		"Bind pprof http server to `address:port`")
 

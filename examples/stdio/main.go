@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"time"
 
 	"github.com/ardnew/embedit"
 	"github.com/ardnew/embedit/sys"
@@ -20,6 +21,15 @@ var rw = &struct {
 	io.Reader
 	io.Writer
 }{os.Stdin, os.Stdout}
+
+// Common options, regardless of profile/trace mode.
+var options = struct {
+	n int           // iterations
+	t time.Duration // step delay
+}{
+	n: 10,
+	t: time.Second,
+}
 
 // mainFunc is the prototype for a pseudo-"main" function. A function with this
 // signature is passed to (and called by) function run, which is conditionally
@@ -65,17 +75,17 @@ func Main() error {
 
 	em.Configure(embedit.Config{RW: rw, Width: 80, Height: 24})
 
-	for i := 0; i < 100000; i++ {
+	for i := 0; i < options.n; i++ {
 		em.Line().Set([]rune("hello there"), 5)
-		// time.Sleep(1 * time.Second)
-		em.Line().Cursor().Move(0, 2, 0, 0)
-		// time.Sleep(1 * time.Second)
+		time.Sleep(options.t)
+		em.Cursor().Move(0, 2, 0, 0)
+		time.Sleep(options.t)
 		if i&1 == 0 {
-			em.Line().Cursor().Move(8, 0, 0, 10)
+			em.Cursor().Move(8, 0, 0, 10)
 		} else {
-			em.Line().Cursor().Move(0, 1, 6, 0)
+			em.Cursor().Move(0, 1, 6, 0)
 		}
-		// time.Sleep(1 * time.Second)
+		time.Sleep(options.t)
 	}
 
 	return nil

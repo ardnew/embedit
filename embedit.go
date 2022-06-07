@@ -3,8 +3,8 @@ package embedit
 import (
 	"io"
 
-	"github.com/ardnew/embedit/history"
 	"github.com/ardnew/embedit/terminal"
+	"github.com/ardnew/embedit/terminal/cursor"
 	"github.com/ardnew/embedit/terminal/line"
 )
 
@@ -17,12 +17,11 @@ type (
 // user interface with some capabilities of a modern terminal.
 //
 // It requires no dynamic memory allocation. Size limitations are defined by
-// compile-time constants in package limit.
+// compile-time constants in package config.
 //
 // Refer to the examples to see how to allocate and configure the object for
 // common use cases.
 type Embedit struct {
-	hist  history.History
 	term  terminal.Terminal
 	valid bool
 }
@@ -39,7 +38,6 @@ type Config struct {
 func (e *Embedit) Configure(config Config) *Embedit {
 	e.valid = false
 	_ = e.term.Configure(config.RW, config.Prompt, config.Width, config.Height)
-	_ = e.hist.Configure(&e.term, &e.term)
 	return e
 }
 
@@ -47,6 +45,13 @@ func (e *Embedit) Configure(config Config) *Embedit {
 func (e *Embedit) init() *Embedit {
 	e.valid = true
 	return e
+}
+
+func (e *Embedit) Cursor() *cursor.Cursor {
+	if e == nil {
+		return nil
+	}
+	return e.term.Cursor()
 }
 
 // Line returns the Terminal's active user input line.

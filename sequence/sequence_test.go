@@ -66,7 +66,7 @@ func TestSequence_Reset(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			if diff := cmp.Diff(tt.want, tt.s.Reset()); len(diff) > 0 {
+			if diff := cmp.Diff(tt.want, tt.s.reset()); len(diff) > 0 {
 				t.Errorf("diff (-want +got):%s\n", diff)
 			}
 		})
@@ -136,32 +136,6 @@ func TestSequence_Write(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			gotN, err := tt.s.Write(tt.args.p)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("wantErr(%t): error = %+v", tt.wantErr, err)
-			}
-			if diff := cmp.Diff(tt.wantN, gotN); len(diff) > 0 {
-				t.Errorf("diff (-want +got):%s\n", diff)
-			}
-		})
-	}
-}
-
-func TestSequence_Append(t *testing.T) {
-	t.Parallel()
-	for name, tt := range map[string]struct {
-		s    *Sequence
-		args struct {
-			p []byte
-		}
-		wantN   int
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-		"": {},
-	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			gotN, err := tt.s.Append(tt.args.p)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("wantErr(%t): error = %+v", tt.wantErr, err)
 			}
