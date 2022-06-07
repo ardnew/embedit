@@ -60,8 +60,38 @@ func (l *Line) Len() (n int) {
 	return utf8.RunesLen(l.Rune[ih:it])
 }
 
+// visibleCount returns the number of visible glyphs in the slice k:k+n of l.
+// If n is negative, returns the number of visible glyphs in l starting at k.
+func (l *Line) visibleCount(k, n int) (count int) {
+	escape := false
+	h, t := l.head.Get(), l.tail.Get()
+	if uint32(k) >= t-h {
+		return 0 // Offset k is greater than rune count.
+	}
+	h += uint32(k)
+	for t-h > 0 && n != 0 {
+		r := l.Rune[h%config.RunesPerLine]
+		switch {
+		case escape:
+			escape = (r < 'a' || 'z' < r) && (r < 'A' || 'Z' < r)
+		case r == key.Escape:
+			escape = true
+		default:
+			count++
+		}
+		h++
+		n--
+	}
+	return count
+}
+
+// VisibleCount returns the number of visible glyphs in l.
+func (l *Line) VisibleCount() (count int) {
+	return l.visibleCount(0, -1)
+}
+
 // RuneCount returns the number of runes in l.
-func (l *Line) RuneCount() (n int) {
+func (l *Line) RuneCount() (count int) {
 	if l == nil {
 		return 0
 	}
@@ -80,31 +110,60 @@ func (l *Line) Reset() *Line {
 }
 
 // Set overwrites the bytes in l and sets its Cursor's logical position.
+// If pos is negative, the Cursor is positioned at the end of the line.
 func (l *Line) Set(s []rune, pos int) (err error) {
 	if l == nil {
 		return Error(ErrReceiver_Line_Set)
 	}
-	if l.disp.Echo() {
-		l.ctrl.Out.Reset()
-		if e := l.curs.MoveTo(0); e != nil {
-			err = e
-		}
-		if e := l.WriteLine(s); e != nil && err == nil {
-			err = e
-		}
-		for i := len(s); i < l.RuneCount(); i++ {
-			if e := l.WriteLine(key.Blank); e != nil && err == nil {
-				err = e
-			}
-		}
-		if e := l.curs.MoveTo(pos); e != nil && err == nil {
-			err = e
-		}
+	if len(s) > config.RunesPerLine {
+		err = Error(ErrOverflow_Line_Set)
+		s = s[:config.RunesPerLine]
 	}
-	if _, e := l.Write([]byte(string(s))); e != nil && err == nil {
-		err = e
+	prevCount := l.RuneCount()
+	currCount := len(s)
+	l.Reset()
+	for i := range s {
+		l.Rune[i] = utf8.Rune(s[i])
+	}
+	padLength := 0
+	for padLength = currCount; padLength < prevCount; padLength++ {
+		l.Rune[padLength] = utf8.Rune(key.Space)
+	}
+	if l.disp.Echo() {
+		if e := l.curs.MoveTo(0); err == nil && e != nil {
+			err = e
+		}
+		l.tail.Set(uint32(padLength))
+		if e := l.Queue(); err == nil && e != nil {
+			err = e
+		}
+		l.tail.Set(uint32(currCount))
+		if e := l.curs.MoveTo(pos); err == nil && e != nil {
+			err = e
+		}
 	}
 	l.setPos(pos)
+	// if l.disp.Echo() {
+	// 	l.ctrl.Out.Reset()
+	// 	if e := l.curs.MoveTo(0); e != nil {
+	// 		err = e
+	// 	}
+	// 	if e := l.WriteLine(s); e != nil && err == nil {
+	// 		err = e
+	// 	}
+	// 	for i := len(s); i < l.RuneCount(); i++ {
+	// 		if e := l.WriteLine(key.Blank); e != nil && err == nil {
+	// 			err = e
+	// 		}
+	// 	}
+	// 	if e := l.curs.MoveTo(pos); e != nil && err == nil {
+	// 		err = e
+	// 	}
+	// }
+	// if _, e := l.Write([]byte(string(s))); e != nil && err == nil {
+	// 	err = e
+	// }
+	// l.setPos(pos)
 	return
 }
 
@@ -121,38 +180,39 @@ func (l *Line) setPos(pos int) {
 	l.posi.Set(uint32(pos))
 }
 
-// WriteLine appends line to the output buffer and advances the cursor's current
+// Queue appends l to the output buffer and advances the cursor's current
 // position to the end of the line.
-func (l *Line) WriteLine(line []rune) (err error) {
+func (l *Line) Queue() (err error) {
 	width := l.disp.Width()
-	for len(line) != 0 {
+	h, t := l.head.Get(), l.tail.Get()
+	for t-h > 0 {
 		free := width - l.curs.X()
-		have := len(line)
+		have := int(t - h)
 		want := have
 		if want > free {
 			want = free
 		}
-		var size, seen, kept int
-		// Copy the bytes in each rune of line to the output buffer, skipping any
-		// runes with an invalid encoding.
+		var seen, kept int
+		// Copy the bytes in each rune of l to the output buffer, skipping any runes
+		// with an invalid encoding.
 		for kept < want && seen < have {
-			curr := utf8.Rune(line[seen])
+			curr := l.Rune[(int(h)+seen)%config.RunesPerLine]
 			seen++
-			if nc, errc := io.Copy(l.ctrl.Out, curr); errc == nil {
-				size += int(nc)
+			if _, errc := io.Copy(l.ctrl.Out, curr); errc == nil {
+				// size += int(nc)
 				kept++
 			}
 		}
 		// Update the cursor's coordinates based on the number of valid, visible
 		// runes written to the output buffer.
-		if l.curs.Advance(key.VisibleLen(line[:seen])) {
+		if l.curs.Advance(l.visibleCount(int(h), seen)) {
 			// If the cursor would write beyond the terminal width (line wrap), then
 			// also append CR+LF to the output buffer.
 			if _, err = l.ctrl.Out.Write(key.CRLF); err != nil {
 				return
 			}
 		}
-		line = line[seen:]
+		h += uint32(seen)
 	}
 	return
 }
@@ -256,6 +316,7 @@ type Error string
 
 const (
 	ErrReceiver_Line_Set   = "line [receiver]: cannot Set with nil receiver"
+	ErrOverflow_Line_Set   = "line [overflow]: cannot Set entire buffer (truncated)"
 	ErrReceiver_Line_Read  = "line [receiver]: cannot Read from nil receiver"
 	ErrArgument_Line_Read  = "line [argument]: cannot Read into nil buffer"
 	ErrReceiver_Line_Write = "line [receiver]: cannot Write into nil receiver"

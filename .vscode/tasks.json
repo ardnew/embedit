@@ -1,0 +1,83 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "stdio: build",
+      "type": "shell",
+      "command": "go",
+      "detail": "Build with debug disabled, profile disabled, and trace disabled",
+      "args": [
+          "build",
+          "-o=.vscode/build/examples/stdio/build.bin",
+          "./examples/stdio"
+      ],
+      "runOptions": {
+        "instanceLimit": 1,
+        "reevaluateOnRerun": true,
+      },
+      "options": {
+          "cwd": "."
+      },
+    },
+    {
+      "label": "stdio: debug",
+      "type": "shell",
+      "command": "go",
+      "detail": "Build with debug enabled, profile disabled, and trace disabled",
+      "args": [
+          "build",
+          "-gcflags=all=-N -l",
+          "-o=.vscode/build/examples/stdio/debug.bin",
+          "./examples/stdio",
+      ],
+      "runOptions": {
+        "instanceLimit": 1,
+        "reevaluateOnRerun": true,
+      },
+      "options": {
+          "cwd": "."
+      },
+    },
+    {
+      "label": "stdio: profile",
+      "type": "shell",
+      "command": "go",
+      "detail": "Build with debug enabled, profile enabled, and trace disabled",
+      "args": [
+          "build",
+          "-tags=pprof",
+          "-gcflags=all=-N -l -m",
+          "-o=.vscode/build/examples/stdio/profile.bin",
+          "./examples/stdio",
+      ],
+      "runOptions": {
+        "instanceLimit": 1,
+        "reevaluateOnRerun": true,
+      },
+      "options": {
+          "cwd": "."
+      },
+    },
+    {
+      "label": "stdio: trace",
+      "type": "shell",
+      "command": "go",
+      "detail": "Build with debug enabled, profile disabled, and trace enabled",
+      "args": [
+          "build",
+          "-tags=trace",
+          "-gcflags=all=-N -l -m",
+          "-o=.vscode/build/examples/stdio/trace.bin",
+          "./examples/stdio",
+      ],
+      "runOptions": {
+        "instanceLimit": 1,
+        "reevaluateOnRerun": true,
+      },
+      "options": {
+          "cwd": "."
+      },
+    },
+
+  ]
+}

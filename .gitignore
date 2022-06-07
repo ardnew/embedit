@@ -3,6 +3,7 @@
 /*.elf
 /*.bin
 /*.png
+/.vscode/build
 *.profile
 *.trace
 go.sum

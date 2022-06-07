@@ -1,8 +1,6 @@
 package cursor
 
 import (
-	"io"
-
 	"github.com/ardnew/embedit/terminal/display"
 	"github.com/ardnew/embedit/terminal/key"
 	"github.com/ardnew/embedit/terminal/wire"
@@ -16,6 +14,7 @@ type Cursor struct {
 	disp  *display.Display
 	x, y  volatile.Register32 // X=0: left edge; Y=0: first row, current Line
 	maxY  volatile.Register32 // Greatest value of Y so far
+	ascii ascii.Uint32
 	valid bool
 }
 
@@ -88,7 +87,8 @@ func (c *Cursor) Move(up, down, left, right int) (err error) {
 	} else if up > 1 {
 		c.ctrl.Out.WriteByte(key.Escape)
 		c.ctrl.Out.WriteByte('[')
-		io.Copy(c.ctrl.Out, ascii.Uint32(up))
+		c.ascii.Val = uint32(up)
+		c.ascii.WriteTo(c.ctrl.Out)
 		c.ctrl.Out.WriteByte('A')
 	}
 	// - - - - - - - - - - - - - - - - - - - -
@@ -100,7 +100,8 @@ func (c *Cursor) Move(up, down, left, right int) (err error) {
 	} else if down > 1 {
 		c.ctrl.Out.WriteByte(key.Escape)
 		c.ctrl.Out.WriteByte('[')
-		io.Copy(c.ctrl.Out, ascii.Uint32(down))
+		c.ascii.Val = uint32(down)
+		c.ascii.WriteTo(c.ctrl.Out)
 		c.ctrl.Out.WriteByte('B')
 	}
 	// - - - - - - - - - - - - - - - - - - - -
@@ -112,7 +113,8 @@ func (c *Cursor) Move(up, down, left, right int) (err error) {
 	} else if left > 1 {
 		c.ctrl.Out.WriteByte(key.Escape)
 		c.ctrl.Out.WriteByte('[')
-		io.Copy(c.ctrl.Out, ascii.Uint32(left))
+		c.ascii.Val = uint32(left)
+		c.ascii.WriteTo(c.ctrl.Out)
 		c.ctrl.Out.WriteByte('D')
 	}
 	// - - - - - - - - - - - - - - - - - - - -
@@ -124,7 +126,8 @@ func (c *Cursor) Move(up, down, left, right int) (err error) {
 	} else if right > 1 {
 		c.ctrl.Out.WriteByte(key.Escape)
 		c.ctrl.Out.WriteByte('[')
-		io.Copy(c.ctrl.Out, ascii.Uint32(right))
+		c.ascii.Val = uint32(right)
+		c.ascii.WriteTo(c.ctrl.Out)
 		c.ctrl.Out.WriteByte('C')
 	}
 	c.ctrl.Flush()

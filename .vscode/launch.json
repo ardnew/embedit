@@ -1,0 +1,100 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "args": [ "-t=0.5s", "-n=5" ],
+      "console": "integratedTerminal",
+      "cwd": ".",
+      "dlvFlags": [
+        "--disable-aslr",
+      ],
+      "hideSystemGoroutines": false,
+      "internalConsoleOptions": "neverOpen",
+      "mode": "exec",
+      "name": "stdio: run",
+      "preLaunchTask": "stdio: build",
+      "presentation": {
+        "hidden": false,
+        "group": "Example: stdio",
+        "order": 1
+      },
+      "program": ".vscode/build/examples/stdio/build.bin",
+      "request": "launch",
+      "showGlobalVariables": true,
+      "showRegisters": true,
+      "type": "go",
+    },
+    {
+      "args": [ "-t=0.5s", "-n=5" ],
+      "console": "integratedTerminal",
+      "cwd": ".",
+      "debugAdapter": "dlv-dap",
+      "dlvFlags": [
+        "--disable-aslr",
+      ],
+      "hideSystemGoroutines": false,
+      "internalConsoleOptions": "neverOpen",
+      "mode": "exec",
+      "name": "stdio: debug",
+      "preLaunchTask": "stdio: debug",
+      "presentation": {
+        "hidden": false,
+        "group": "Example: stdio",
+        "order": 2
+      },
+      "program": ".vscode/build/examples/stdio/debug.bin",
+      "request": "launch",
+      "showGlobalVariables": true,
+      "showRegisters": true,
+      "type": "go",
+    },
+    {
+      "args": [ "-t=0.5s", "-n=5" ],
+      "console": "integratedTerminal",
+      "cwd": ".",
+      "debugAdapter": "dlv-dap",
+      "dlvFlags": [
+        "--disable-aslr",
+      ],
+      "hideSystemGoroutines": false,
+      "internalConsoleOptions": "neverOpen",
+      "mode": "exec",
+      "name": "stdio: profile",
+      "preLaunchTask": "stdio: profile",
+      "presentation": {
+        "hidden": false,
+        "group": "Example: stdio",
+        "order": 3
+      },
+      "program": ".vscode/build/examples/stdio/profile.bin",
+      "request": "launch",
+      "showGlobalVariables": true,
+      "showRegisters": true,
+      "type": "go",
+    },
+    {
+      "args": [ "-t=0.5s", "-n=5" ],
+      "console": "integratedTerminal",
+      "cwd": ".",
+      "debugAdapter": "dlv-dap",
+      "dlvFlags": [
+        "--disable-aslr",
+      ],
+      "hideSystemGoroutines": false,
+      "internalConsoleOptions": "neverOpen",
+      "mode": "exec",
+      "name": "stdio: trace",
+      "preLaunchTask": "stdio: trace",
+      "presentation": {
+        "hidden": false,
+        "group": "Example: stdio",
+        "order": 4
+      },
+      "program": ".vscode/build/examples/stdio/trace.bin",
+      "request": "launch",
+      "showGlobalVariables": true,
+      "showRegisters": true,
+      "type": "go",
+    }
+  ]
+}

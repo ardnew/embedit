@@ -76,6 +76,8 @@ func Main() error {
 	em.Configure(embedit.Config{RW: rw, Width: 80, Height: 24})
 
 	for i := 0; i < options.n; i++ {
+		em.Cursor().Move(0, 15, 0, 0)
+		time.Sleep(options.t)
 		em.Line().Set([]rune("hello there"), 5)
 		time.Sleep(options.t)
 		em.Cursor().Move(0, 2, 0, 0)

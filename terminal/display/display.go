@@ -98,7 +98,9 @@ func (d *Display) Prompt() []rune {
 func (d *Display) SetPrompt(prompt []rune) {
 	if d != nil {
 		if prompt == nil {
-			d.prompt = d.prompt[:0:cap(d.prompt)]
+			for i := range d.prompt {
+				d.prompt[i] = 0
+			}
 		} else {
 			d.prompt = prompt
 		}

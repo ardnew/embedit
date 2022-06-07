@@ -1,0 +1,74 @@
+// —————————————————————————————————————————————————————————————————————————————
+//   —— VS CODE WORKSPACE SETTINGS
+//   ——   » Sync: Linux, macOS, Windows
+//   ——   » User: github.com/ardnew (andrew@ardnew.com)
+// —————————————————————————————————————————————————————————————————————————————
+//   —— NOTES
+//   ——   » Find lines containing a terminating delimiter without a trailing
+//   ——     comma after the last field in a composite data structure:
+//   ——         ^\s*([}\]]|"[^"]+":[^,{[]+)$
+//   ——     • Technically, these commas are invalid strict JSON syntax, but the
+//   ——       VS Code parser permits them (with inline warnings, if configured).
+//   ——     • I prefer to keep the illegal comma, as it simplifies appending and
+//   ——       reordering fields within structures.
+// —————————————————————————————————————————————————————————————————————————————
+{
+  // ---------------------------------------------------------------------------
+  // === go
+  // ---------------------------------------------------------------------------
+  "go.buildFlags": [],
+  "go.delveConfig": {
+    "hideSystemGoroutines": false,
+    "showGlobalVariables": true,
+    "showRegisters": true,
+    "debugAdapter": "dlv-dap",
+    "dlvFlags": [
+      "--disable-aslr"
+    ]
+  },
+  "go.disableConcurrentTests": true,
+  "go.formatTool": "gofumports",
+  "go.generateTestsFlags": [
+    "-i",
+    "-exported",
+    "-template_dir=/usr/local/src/gotests-template/parallel",
+  ],
+  "go.lintFlags": [
+    "-formatter=stylish",
+  ],
+  "go.lintOnSave": "workspace",
+  "go.lintTool": "revive",
+  "go.testFlags": [
+    "-tags=test",
+    //"-failfast",
+    "-v",
+  ],
+  // ---------------------------------------------------------------------------
+  // === gopls
+  // ---------------------------------------------------------------------------
+  "gopls": {
+    "build.buildFlags": [
+
+    ],
+    "formatting.gofumpt": true,
+    "ui.diagnostic.analyses": {
+      "fieldalignment": true,
+      "nilness": true,
+      "shadow": true,
+      "unusedparams": true,
+      "unusedwrite": true,
+      "useany": true,
+    },
+    "ui.diagnostic.staticcheck": true,
+  },
+  // ===========================================================================
+  // === [OVERRIDES]
+  // ===========================================================================
+  "[go]": {
+    "files.insertFinalNewline": false,
+  },
+  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // ------------ Settings beyond this line have not been reviewed! ------------
+  // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  "": {},
+}

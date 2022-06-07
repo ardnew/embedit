@@ -7,22 +7,14 @@ import (
 
 const host32bit = ^uint(0)>>32 == 0
 
-type Uint32 uint32
-
-// WriteUint32 writes the decimal string representation of u to w.
-func WriteUint32(w io.Writer, u uint32) (n int, err error) {
-	i, err := io.Copy(w, Uint32(u))
-	return int(i), err
-}
-
-// Read copies the decimal string representation of u into p.
-func (u Uint32) Read(p []byte) (n int, err error) {
-	i, err := io.Copy(bytes.NewBuffer(p), u)
-	return int(i), err
+type Uint32 struct {
+	buf [10]byte
+	Val uint32
 }
 
 // WriteTo writes the decimal string representation of u to w.
-func (u Uint32) WriteTo(w io.Writer) (n int64, err error) {
+func (p *Uint32) WriteTo(w io.Writer) (n int64, err error) {
+	u := p.Val
 	switch { // Fast paths for small integers
 	case u < 10:
 		_, err = w.Write(digit[u : u+1])
@@ -31,8 +23,11 @@ func (u Uint32) WriteTo(w io.Writer) (n int64, err error) {
 		i, err := w.Write(lut[u*2 : u*2+2])
 		return int64(i), err
 	}
-	var a [10]byte // Maximum length of 32-bit decimal
-	i := len(a)
+	// var a [10]byte // Maximum length of 32-bit decimal
+	for i := range p.buf {
+		p.buf[i] = 0
+	}
+	i := len(p.buf)
 	if host32bit {
 		// Convert the lower digits using 32-bit operations
 		for ; u >= 1e9; u /= 1e9 {
@@ -41,28 +36,28 @@ func (u Uint32) WriteTo(w io.Writer) (n int64, err error) {
 				v := r % 100 * 2
 				r /= 100
 				i -= 2
-				a[i+1] = lut[v+1]
-				a[i+0] = lut[v+0]
+				p.buf[i+1] = lut[v+1]
+				p.buf[i+0] = lut[v+0]
 			}
 			i--
-			a[i] = lut[r*2+1]
+			p.buf[i] = lut[r*2+1]
 		}
 	}
 	for u >= 100 {
 		v := u % 100 * 2
 		u /= 100
 		i -= 2
-		a[i+1] = lut[v+1]
-		a[i+0] = lut[v+0]
+		p.buf[i+1] = lut[v+1]
+		p.buf[i+0] = lut[v+0]
 	}
 	u *= 2
 	i--
-	a[i] = lut[u+1]
+	p.buf[i] = lut[u+1]
 	if u >= 20 {
 		i--
-		a[i] = lut[u]
+		p.buf[i] = lut[u]
 	}
-	nw, errw := w.Write(a[i:])
+	nw, errw := bytes.NewBuffer(p.buf[i:]).WriteTo(w)
 	return int64(nw), errw
 }
 
