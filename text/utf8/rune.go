@@ -15,44 +15,67 @@ func RunesLen(p []Rune) (n int) {
 	return
 }
 
+// Rune returns r as native Go type rune.
+func (r *Rune) Rune() rune {
+	return rune(*r)
+}
+
 // Len returns the number of bytes required to encode r.
 // Returns 0 if r is not a valid UTF-8 encoding.
-func (r Rune) Len() (n int) {
-	u := rune(r)
+func (r *Rune) Len() (n int) {
+	u := rune(*r)
 	if n = utf8.RuneLen(u); n < 0 {
 		return 0
 	}
 	return
 }
 
+// Equals returns true if and only if r is the same code point as a.
+func (r *Rune) Equals(a rune) bool {
+	return rune(*r) == a
+}
+
 // Encode writes into p the UTF-8 encoding of r and returns the number of bytes
 // written.
 // Returns 0, ErrOverflow if p is not large enough to hold the encoding of r.
-func (r Rune) Encode(p []byte) (n int, err error) {
+func (r *Rune) Encode(p []byte) (n int, err error) {
 	if n = r.Len(); n == 0 {
-		return 0, ErrReceiver("cannot Encode from invalid receiver")
+		return 0, ErrReceiverEncode
 	}
 	if p == nil {
-		return 0, ErrArgument("cannot Encode into nil buffer")
+		return 0, ErrArgumentEncode
 	}
 	pn := len(p)
 	if n > pn {
-		return 0, ErrOverflow("cannot Encode into undersized buffer")
+		return 0, ErrOverflowEncode
 	}
-	return utf8.EncodeRune(p, rune(r)), nil
+	return utf8.EncodeRune(p, rune(*r)), nil
 }
 
-func (r Rune) Read(p []byte) (n int, err error) {
+func (r *Rune) Read(p []byte) (n int, err error) {
 	return r.Encode(p)
 }
 
 // Types of errors returned by Rune methods.
-type (
-	ErrReceiver string
-	ErrArgument string
-	ErrOverflow string
+type Error int
+
+const (
+	OK Error = iota
+	ErrReceiverEncode
+	ErrArgumentEncode
+	ErrOverflowEncode
 )
 
-func (e ErrReceiver) Error() string { return "rune [receiver]: " + string(e) }
-func (e ErrArgument) Error() string { return "rune [argument]: " + string(e) }
-func (e ErrOverflow) Error() string { return "rune [overflow]: " + string(e) }
+func (e Error) Error() string {
+	switch e {
+	case OK:
+		return ""
+	case ErrReceiverEncode:
+		return "rune [receiver]: cannot Encode from invalid receiver"
+	case ErrArgumentEncode:
+		return "rune [argument]: cannot Encode into nil buffer"
+	case ErrOverflowEncode:
+		return "rune [overflow]: cannot Encode into undersized buffer"
+	}
+	return "rune [unknown]"
+}

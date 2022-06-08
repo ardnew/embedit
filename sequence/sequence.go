@@ -56,10 +56,10 @@ func (s *Sequence) Reset() {
 // bytes copied.
 func (s *Sequence) Read(p []byte) (n int, err error) {
 	if s == nil {
-		return 0, ErrReceiver("cannot Read from nil receiver")
+		return 0, ErrReceiverRead
 	}
 	if p == nil {
-		return 0, ErrArgument("cannot Read into nil buffer")
+		return 0, ErrArgumentRead
 	}
 	var ns int
 	ns, n = s.Len(), len(p)
@@ -86,10 +86,10 @@ func (s *Sequence) Read(p []byte) (n int, err error) {
 // all of p could not be copied.
 func (s *Sequence) Write(p []byte) (n int, err error) {
 	if s == nil {
-		return 0, ErrReceiver("cannot Write into nil receiver")
+		return 0, ErrReceiverWrite
 	}
 	if p == nil {
-		return 0, ErrArgument("cannot Write from nil buffer")
+		return 0, ErrArgumentWrite
 	}
 	np := len(p)
 	if np == 0 {
@@ -113,7 +113,7 @@ func (s *Sequence) Write(p []byte) (n int, err error) {
 		s.tail.Set(t)
 	}
 	if n < np {
-		err = ErrOverflow("cannot Write entire buffer (short write)")
+		err = ErrOverflowWrite
 	}
 	return
 }
@@ -129,7 +129,7 @@ func (s *Sequence) readFrom(r io.Reader, lo, hi int) (n int, err error) {
 		// The above condition implies 0<=lo < hi<=N:
 		//   If lo<hi and lo>=0, then hi>0 (i.e.: 0<=lo<hi => hi>0).
 		//   If lo<hi and hi<=N, then lo<N (i.e.: lo<hi<=N => lo<N).
-		return 0, ErrArgument("cannot readFrom into invalid slice indices")
+		return 0, errArgumentReadFrom
 	}
 	n, err = r.Read(s.Byte[lo:hi])
 	// Extend the length of s by the number of bytes copied.
@@ -158,10 +158,10 @@ func maskReadFromError(errPtr *error) {
 // if both are implemented as buffers of physical memory.
 func (s *Sequence) ReadFrom(r io.Reader) (n int64, err error) {
 	if s == nil {
-		return 0, ErrReceiver("cannot ReadFrom into nil receiver")
+		return 0, ErrReceiverReadFrom
 	}
 	if r == nil {
-		return 0, ErrArgument("cannot ReadFrom from nil io.Reader")
+		return 0, ErrArgumentReadFrom
 	}
 	// Catch any attempt to return io.EOF and return nil instead.
 	// See documentation on (*Sequence).ReadFrom, io.ReaderFrom, and io.Copy.
@@ -182,7 +182,7 @@ func (s *Sequence) ReadFrom(r io.Reader) (n int64, err error) {
 	// and return an error. Opting for the latter so that no bytes are lost, and
 	// it gives the caller an opportunity to remedy the situation.
 	if it == ih {
-		return 0, ErrOverflow("cannot ReadFrom into full receiver")
+		return 0, ErrOverflowReadFrom
 	}
 	// When first-in (head) element is located at index 0 (i.e., the start of the
 	// backing array), then the unused space spans exactly one region only;
@@ -241,7 +241,7 @@ func (s *Sequence) writeTo(w io.Writer, lo, hi int) (n int, err error) {
 		// The above condition implies 0<=lo < hi<=N:
 		//   If lo<hi and lo>=0, then hi>0 (i.e.: 0<=lo<hi => hi>0).
 		//   If lo<hi and hi<=N, then lo<N (i.e.: lo<hi<=N => lo<N).
-		return 0, ErrArgument("cannot writeTo from invalid slice indices")
+		return 0, errArgumentWriteTo
 	}
 	n, err = w.Write(s.Byte[lo:hi])
 	// Check if we copied all bytes, regardless of error.
@@ -263,10 +263,10 @@ func (s *Sequence) writeTo(w io.Writer, lo, hi int) (n int, err error) {
 // if both are implemented as buffers of physical memory.
 func (s *Sequence) WriteTo(w io.Writer) (n int64, err error) {
 	if s == nil {
-		return 0, ErrReceiver("cannot WriteTo from nil receiver")
+		return 0, ErrReceiverWriteTo
 	}
 	if w == nil {
-		return 0, ErrArgument("cannot WriteTo into nil io.Writer")
+		return 0, ErrArgumentWriteTo
 	}
 	h, t := s.head.Get(), s.tail.Get()
 	if h == t {
@@ -320,7 +320,7 @@ func (s *Sequence) WriteTo(w io.Writer) (n int64, err error) {
 // In particular, ReadByte never returns a byte read from s and error == io.EOF.
 func (s *Sequence) ReadByte() (b byte, err error) {
 	if s == nil {
-		return 0, ErrReceiver("cannot ReadByte from nil receiver")
+		return 0, ErrReceiverReadByte
 	}
 	h, t := s.head.Get(), s.tail.Get()
 	switch h {
@@ -340,7 +340,7 @@ func (s *Sequence) ReadByte() (b byte, err error) {
 // If s is full, returns ErrOverflow.
 func (s *Sequence) WriteByte(b byte) (err error) {
 	if s == nil {
-		return ErrReceiver("cannot WriteByte into nil receiver")
+		return ErrReceiverWriteByte
 	}
 	h, t := s.head.Get(), s.tail.Get()
 	if h == t {
@@ -357,7 +357,7 @@ func (s *Sequence) WriteByte(b byte) (err error) {
 	// for the latter so that no byte is lost, and it gives the caller an
 	// opportunity to remedy the situation.
 	if it == h%config.BytesPerSequence {
-		return ErrOverflow("cannot WriteByte into full receiver")
+		return ErrOverflowWriteByte
 	}
 	// Write the byte into tail position and increment length by 1.
 	s.Byte[it] = b
@@ -366,12 +366,61 @@ func (s *Sequence) WriteByte(b byte) (err error) {
 }
 
 // Types of errors returned by Sequence methods.
-type (
-	ErrReceiver string
-	ErrArgument string
-	ErrOverflow string
+type Error int
+
+const (
+	OK Error = iota
+	ErrReceiverRead
+	ErrArgumentRead
+	ErrReceiverWrite
+	ErrArgumentWrite
+	ErrOverflowWrite
+	errArgumentReadFrom
+	ErrReceiverReadFrom
+	ErrArgumentReadFrom
+	ErrOverflowReadFrom
+	errArgumentWriteTo
+	ErrReceiverWriteTo
+	ErrArgumentWriteTo
+	ErrReceiverReadByte
+	ErrReceiverWriteByte
+	ErrOverflowWriteByte
 )
 
-func (e ErrReceiver) Error() string { return "sequence [receiver]: " + string(e) }
-func (e ErrArgument) Error() string { return "sequence [argument]: " + string(e) }
-func (e ErrOverflow) Error() string { return "sequence [overflow]: " + string(e) }
+func (e Error) Error() string {
+	switch e {
+	case OK:
+		return ""
+	case ErrReceiverRead:
+		return "sequence [receiver]: cannot Read from nil receiver"
+	case ErrArgumentRead:
+		return "sequence [argument]: cannot Read into nil buffer"
+	case ErrReceiverWrite:
+		return "sequence [receiver]: cannot Write into nil receiver"
+	case ErrArgumentWrite:
+		return "sequence [argument]: cannot Write from nil buffer"
+	case ErrOverflowWrite:
+		return "sequence [overflow]: cannot Write entire buffer (short write)"
+	case errArgumentReadFrom:
+		return "sequence [argument]: cannot readFrom into invalid slice indices"
+	case ErrReceiverReadFrom:
+		return "sequence [receiver]: cannot ReadFrom into nil receiver"
+	case ErrArgumentReadFrom:
+		return "sequence [argument]: cannot ReadFrom from nil io.Reader"
+	case ErrOverflowReadFrom:
+		return "sequence [overflow]: cannot ReadFrom into full receiver"
+	case errArgumentWriteTo:
+		return "sequence [argument]: cannot writeTo from invalid slice indices"
+	case ErrReceiverWriteTo:
+		return "sequence [receiver]: cannot WriteTo from nil receiver"
+	case ErrArgumentWriteTo:
+		return "sequence [argument]: cannot WriteTo into nil io.Writer"
+	case ErrReceiverReadByte:
+		return "sequence [receiver]: cannot ReadByte from nil receiver"
+	case ErrReceiverWriteByte:
+		return "sequence [receiver]: cannot WriteByte into nil receiver"
+	case ErrOverflowWriteByte:
+		return "sequence [overflow]: cannot WriteByte into full receiver"
+	}
+	return "sequence [unknown]"
+}

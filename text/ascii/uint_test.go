@@ -44,8 +44,9 @@ func TestWriteUint32(t *testing.T) {
 			s := fmt.Sprintf("%s%d", tb, tt)
 			t.Run(fmt.Sprintf("%#v,%d", tb, tt), func(t *testing.T) {
 				var sb strings.Builder
+				u32 := Uint32{Val: tt}
 				_, _ = sb.Write(tb)
-				_, _ = WriteUint32(&sb, tt)
+				u32.WriteTo(&sb)
 				if sb.String() != s {
 					t.Fatalf("Utoa() = %v, want %v", sb.String(), s)
 				}

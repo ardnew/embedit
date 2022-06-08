@@ -76,16 +76,16 @@ func Main() error {
 	em.Configure(embedit.Config{RW: rw, Width: 80, Height: 24})
 
 	for i := 0; i < options.n; i++ {
-		em.Cursor().Move(0, 15, 0, 0)
+		em.Line().SetPos([]rune("hello there"), 7)
 		time.Sleep(options.t)
-		em.Line().Set([]rune("hello there"), 5)
+		em.Line().ErasePrevious(3)
 		time.Sleep(options.t)
-		em.Cursor().Move(0, 2, 0, 0)
+		em.Line().Set([]rune("wat"))
 		time.Sleep(options.t)
 		if i&1 == 0 {
-			em.Cursor().Move(8, 0, 0, 10)
+			em.Cursor().Queue(8, 0, 0, 0)
 		} else {
-			em.Cursor().Move(0, 1, 6, 0)
+			em.Cursor().Queue(0, 8, 0, 20)
 		}
 		time.Sleep(options.t)
 	}

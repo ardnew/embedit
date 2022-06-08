@@ -171,19 +171,37 @@ func IsPrintable(key rune) bool {
 	return key >= Space && (key < Unknown || surrogateMask < key)
 }
 
-// VisibleLen returns the number of visible glyphs in s.
-func VisibleLen(s []rune) int {
-	escape := false
-	length := 0
-	for _, r := range s {
-		switch {
-		case escape:
-			escape = (r < 'a' || 'z' < r) && (r < 'A' || 'Z' < r)
-		case r == Escape:
-			escape = true
-		default:
-			length++
-		}
+// GlyphCount provides methods for counting the number of visible glyphs in a
+// sequence of runes. Runes are provided one at a time to method Scan, and the
+// the current sum of visible glyphs is returned with each call.
+//
+// GlyphCount keeps track of whether or not otherwise-visible glyphs are bytes
+// in an escape sequence, and excludes those from the count.
+//
+// This object is used in cases where runes are not guaranteed to be stored
+// contiguously in an array, string, or slice (e.g., circular FIFO), so the
+// caller acts as a range operator.
+type GlyphCount struct {
+	count int
+	inEsc bool
+}
+
+// Reset sets count to 0 and escape sequence flag to false.
+func (g *GlyphCount) Reset() {
+	g.count = 0
+	g.inEsc = false
+}
+
+// Scan reads the given rune and then updates and returns the total number of
+// visible glyphs scanned so far.
+func (g *GlyphCount) Scan(r rune) int {
+	switch {
+	case g.inEsc:
+		g.inEsc = (r < 'a' || 'z' < r) && (r < 'A' || 'Z' < r)
+	case r == Escape:
+		g.inEsc = true
+	default:
+		g.count++
 	}
-	return length
+	return g.count
 }
