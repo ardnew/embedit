@@ -160,7 +160,7 @@ func (l *Line) ErasePrevious(n int) (err error) {
 		return err
 	}
 	// Overwrite leading runes with trailing runes
-	h, t := l.head.Get(), l.tail.Get()
+	h, t := l.head.Get(), l.tail.Get()-uint32(n)
 	s := scanner{line: l}
 	if hs := h; s.slice(pos+n, -1) {
 		for {
@@ -173,19 +173,22 @@ func (l *Line) ErasePrevious(n int) (err error) {
 		}
 	}
 	// Erase the trailing runes with spaces
-	l.tail.Set(t - uint32(n))
 	for i := 0; i < n; i++ {
 		l.Rune[(t+uint32(i))%config.RunesPerLine] = key.Space
 	}
 	if l.disp.Echo() {
+		// Temporarily adjust head to rewrite only the changed portion of text.
+		l.head.Set(h + uint32(pos))
+		// Write out the text right-of the deletion, including the 0x20 erasors
 		if e := l.Queue(); e != nil {
 			err = e
 		}
-		// l.head.Set(h)
+		// Reset head back to the actual beginning of the line.
+		l.head.Set(h)
 	}
-	if l.disp.Echo() {
-		l.setPos(pos)
-	}
+	// Finally truncate tail, set final cursor position, and flush output buffer.
+	l.tail.Set(t)
+	l.setPos(pos)
 	return
 }
 
@@ -308,7 +311,7 @@ func (l *Line) Queue() (err error) {
 		}
 		// Update the cursor's coordinates based on the number of valid, visible
 		// runes written to the output buffer.
-		if l.curs.Advance(l.glyphCount(int(h), seen)) {
+		if l.curs.Advance(l.glyphCount(0, seen)) {
 			// If the cursor would write beyond the terminal width (line wrap), then
 			// also append CR+LF to the output buffer.
 			if _, err = l.ctrl.Out.Write(key.CRLF); err != nil {
@@ -317,6 +320,7 @@ func (l *Line) Queue() (err error) {
 		}
 		h += uint32(seen)
 	}
+	_, err = l.ctrl.Flush()
 	return
 }
 
@@ -460,38 +464,13 @@ func (s *scanner) next() (r utf8.Rune, ok bool) {
 	return key.Null, false
 }
 
-// Types of errors returned by Line methods.
-type Error int
-
-const (
-	OK Error = iota
-	ErrReceiverLineSet
-	ErrOverflowLineSet
-	ErrReceiverLineRead
-	ErrArgumentLineRead
-	ErrReceiverLineWrite
-	ErrArgumentLineWrite
-	ErrOverflowLineWrite
+// Errors returned by Line methods.
+var (
+	ErrReceiverLineSet   error
+	ErrOverflowLineSet   error
+	ErrReceiverLineRead  error
+	ErrArgumentLineRead  error
+	ErrReceiverLineWrite error
+	ErrArgumentLineWrite error
+	ErrOverflowLineWrite error
 )
-
-func (e Error) Error() string {
-	switch e {
-	case OK:
-		return ""
-	case ErrReceiverLineSet:
-		return "line [receiver]: cannot Set with nil receiver"
-	case ErrOverflowLineSet:
-		return "line [overflow]: cannot Set entire buffer (truncated)"
-	case ErrReceiverLineRead:
-		return "line [receiver]: cannot Read from nil receiver"
-	case ErrArgumentLineRead:
-		return "line [argument]: cannot Read into nil buffer"
-	case ErrReceiverLineWrite:
-		return "line [receiver]: cannot Write into nil receiver"
-	case ErrArgumentLineWrite:
-		return "line [argument]: cannot Write from nil buffer"
-	case ErrOverflowLineWrite:
-		return "line [overflow]: cannot Write entire buffer (short write)"
-	}
-	return "line [unknown]"
-}

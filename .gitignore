@@ -7,3 +7,5 @@
 *.profile
 *.trace
 go.sum
+/stdio
+/tinygo

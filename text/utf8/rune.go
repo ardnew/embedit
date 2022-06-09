@@ -56,26 +56,9 @@ func (r *Rune) Read(p []byte) (n int, err error) {
 	return r.Encode(p)
 }
 
-// Types of errors returned by Rune methods.
-type Error int
-
-const (
-	OK Error = iota
-	ErrReceiverEncode
-	ErrArgumentEncode
-	ErrOverflowEncode
+// Errors returned by Rune methods.
+var (
+	ErrReceiverEncode error
+	ErrArgumentEncode error
+	ErrOverflowEncode error
 )
-
-func (e Error) Error() string {
-	switch e {
-	case OK:
-		return ""
-	case ErrReceiverEncode:
-		return "rune [receiver]: cannot Encode from invalid receiver"
-	case ErrArgumentEncode:
-		return "rune [argument]: cannot Encode into nil buffer"
-	case ErrOverflowEncode:
-		return "rune [overflow]: cannot Encode into undersized buffer"
-	}
-	return "rune [unknown]"
-}

@@ -28,7 +28,7 @@ var options = struct {
 	t time.Duration // step delay
 }{
 	n: 10,
-	t: time.Second,
+	t: 0 * time.Second,
 }
 
 // mainFunc is the prototype for a pseudo-"main" function. A function with this
@@ -75,20 +75,19 @@ func Main() error {
 
 	em.Configure(embedit.Config{RW: rw, Width: 80, Height: 24})
 
-	for i := 0; i < options.n; i++ {
-		em.Line().SetPos([]rune("hello there"), 7)
-		time.Sleep(options.t)
-		em.Line().ErasePrevious(3)
-		time.Sleep(options.t)
-		em.Line().Set([]rune("wat"))
-		time.Sleep(options.t)
-		if i&1 == 0 {
-			em.Cursor().Queue(8, 0, 0, 0)
-		} else {
-			em.Cursor().Queue(0, 8, 0, 20)
-		}
-		time.Sleep(options.t)
-	}
+	em.Line().SetPos([]rune("hello there"), 7)
+	// time.Sleep(options.t)
+	em.Line().ErasePrevious(3)
+	// time.Sleep(options.t)
+	em.Line().Set([]rune("wat"))
+	// time.Sleep(options.t)
+
+	// em.Line().SetPos([]rune("hello there"), 9)
+	// time.Sleep(options.t)
+	// em.Line().ErasePrevious(3)
+	// time.Sleep(options.t)
+	// em.Line().Set([]rune("wat"))
+	// time.Sleep(options.t)
 
 	return nil
 }

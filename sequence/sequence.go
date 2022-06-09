@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"github.com/ardnew/embedit/config"
+	"github.com/ardnew/embedit/util"
 	"github.com/ardnew/embedit/volatile"
 )
 
@@ -129,22 +130,14 @@ func (s *Sequence) readFrom(r io.Reader, lo, hi int) (n int, err error) {
 		// The above condition implies 0<=lo < hi<=N:
 		//   If lo<hi and lo>=0, then hi>0 (i.e.: 0<=lo<hi => hi>0).
 		//   If lo<hi and hi<=N, then lo<N (i.e.: lo<hi<=N => lo<N).
-		return 0, errArgumentReadFrom
+		return 0, ErrArgumentReadFromRange
 	}
-	n, err = r.Read(s.Byte[lo:hi])
+	// Catch any attempt to return io.EOF and return nil instead.
+	// See documentation on io.ReaderFrom, and io.Copy.
+	n, err = util.EOFMask{Reader: r}.Read(s.Byte[lo:hi])
 	// Extend the length of s by the number of bytes copied.
 	s.tail.Set(s.tail.Get() + uint32(n))
 	return
-}
-
-// maskReadFromError sets the error value referenced by errPtr to nil if and
-// only if the value == io.EOF.
-//
-// See documentation on (*Sequence).ReadFrom, io.ReaderFrom, and io.Copy.
-func maskReadFromError(errPtr *error) {
-	if *errPtr == io.EOF {
-		*errPtr = nil
-	}
 }
 
 // ReadFrom copies bytes from r to s until all bytes have been read or an error
@@ -163,9 +156,6 @@ func (s *Sequence) ReadFrom(r io.Reader) (n int64, err error) {
 	if r == nil {
 		return 0, ErrArgumentReadFrom
 	}
-	// Catch any attempt to return io.EOF and return nil instead.
-	// See documentation on (*Sequence).ReadFrom, io.ReaderFrom, and io.Copy.
-	defer maskReadFromError(&err)
 	h, t := s.head.Get(), s.tail.Get()
 	if h == t {
 		// Sequence is empty, ensure our indices are reset before writing across the
@@ -241,7 +231,7 @@ func (s *Sequence) writeTo(w io.Writer, lo, hi int) (n int, err error) {
 		// The above condition implies 0<=lo < hi<=N:
 		//   If lo<hi and lo>=0, then hi>0 (i.e.: 0<=lo<hi => hi>0).
 		//   If lo<hi and hi<=N, then lo<N (i.e.: lo<hi<=N => lo<N).
-		return 0, errArgumentWriteTo
+		return 0, ErrArgumentWriteToRange
 	}
 	n, err = w.Write(s.Byte[lo:hi])
 	// Check if we copied all bytes, regardless of error.
@@ -365,62 +355,21 @@ func (s *Sequence) WriteByte(b byte) (err error) {
 	return nil
 }
 
-// Types of errors returned by Sequence methods.
-type Error int
-
-const (
-	OK Error = iota
-	ErrReceiverRead
-	ErrArgumentRead
-	ErrReceiverWrite
-	ErrArgumentWrite
-	ErrOverflowWrite
-	errArgumentReadFrom
-	ErrReceiverReadFrom
-	ErrArgumentReadFrom
-	ErrOverflowReadFrom
-	errArgumentWriteTo
-	ErrReceiverWriteTo
-	ErrArgumentWriteTo
-	ErrReceiverReadByte
-	ErrReceiverWriteByte
-	ErrOverflowWriteByte
+// Errors returned by Sequence methods.
+var (
+	ErrReceiverRead          error
+	ErrArgumentRead          error
+	ErrReceiverWrite         error
+	ErrArgumentWrite         error
+	ErrOverflowWrite         error
+	ErrArgumentReadFromRange error
+	ErrReceiverReadFrom      error
+	ErrArgumentReadFrom      error
+	ErrOverflowReadFrom      error
+	ErrArgumentWriteToRange  error
+	ErrReceiverWriteTo       error
+	ErrArgumentWriteTo       error
+	ErrReceiverReadByte      error
+	ErrReceiverWriteByte     error
+	ErrOverflowWriteByte     error
 )
-
-func (e Error) Error() string {
-	switch e {
-	case OK:
-		return ""
-	case ErrReceiverRead:
-		return "sequence [receiver]: cannot Read from nil receiver"
-	case ErrArgumentRead:
-		return "sequence [argument]: cannot Read into nil buffer"
-	case ErrReceiverWrite:
-		return "sequence [receiver]: cannot Write into nil receiver"
-	case ErrArgumentWrite:
-		return "sequence [argument]: cannot Write from nil buffer"
-	case ErrOverflowWrite:
-		return "sequence [overflow]: cannot Write entire buffer (short write)"
-	case errArgumentReadFrom:
-		return "sequence [argument]: cannot readFrom into invalid slice indices"
-	case ErrReceiverReadFrom:
-		return "sequence [receiver]: cannot ReadFrom into nil receiver"
-	case ErrArgumentReadFrom:
-		return "sequence [argument]: cannot ReadFrom from nil io.Reader"
-	case ErrOverflowReadFrom:
-		return "sequence [overflow]: cannot ReadFrom into full receiver"
-	case errArgumentWriteTo:
-		return "sequence [argument]: cannot writeTo from invalid slice indices"
-	case ErrReceiverWriteTo:
-		return "sequence [receiver]: cannot WriteTo from nil receiver"
-	case ErrArgumentWriteTo:
-		return "sequence [argument]: cannot WriteTo into nil io.Writer"
-	case ErrReceiverReadByte:
-		return "sequence [receiver]: cannot ReadByte from nil receiver"
-	case ErrReceiverWriteByte:
-		return "sequence [receiver]: cannot WriteByte into nil receiver"
-	case ErrOverflowWriteByte:
-		return "sequence [overflow]: cannot WriteByte into full receiver"
-	}
-	return "sequence [unknown]"
-}
