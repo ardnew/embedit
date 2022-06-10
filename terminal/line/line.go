@@ -46,6 +46,17 @@ func (l *Line) init() *Line {
 	return l.Reset()
 }
 
+// Reset sets the Line length to 0 and resets the cursor position.
+func (l *Line) Reset() *Line {
+	if l == nil {
+		return nil
+	}
+	l.posi.Set(0)
+	l.head.Set(0)
+	l.tail.Set(0)
+	return l
+}
+
 // Len returns the number of bytes in l.
 func (l *Line) Len() (n int) {
 	if l == nil {
@@ -59,29 +70,7 @@ func (l *Line) Len() (n int) {
 	return utf8.RunesLen(l.Rune[ih:it])
 }
 
-// glyphCount returns the number of visible glyphs in the slice k:k+n of l.
-// If n is negative, returns the number of visible glyphs in l starting at k.
-func (l *Line) glyphCount(k, n int) (count int) {
-	h, t := l.head.Get(), l.tail.Get()
-	if uint32(k) >= t-h {
-		return 0 // Offset k is greater than rune count.
-	}
-	h += uint32(k)
-	var g key.GlyphCount
-	for t-h > 0 && n != 0 {
-		count = g.Scan(l.Rune[h%config.RunesPerLine].Rune())
-		h++
-		n--
-	}
-	return count
-}
-
-// GlyphCount returns the number of visible glyphs in l.
-func (l *Line) GlyphCount() (count int) {
-	return l.glyphCount(0, -1)
-}
-
-// RuneCount returns the number of runes in l.
+// RuneCount returns the total number of runes in l.
 func (l *Line) RuneCount() (count int) {
 	if l == nil {
 		return 0
@@ -89,13 +78,39 @@ func (l *Line) RuneCount() (count int) {
 	return int(l.tail.Get() - l.head.Get())
 }
 
-func (l *Line) PromptCount() (count int) {
+// countUnescRunesInRange returns the number of unescaped runes in l starting at
+// k and ending at k+n-1 (inclusive).
+// If n is negative, returns the number of unescaped runes in l starting at k.
+//
+// See type key.UnescRuneCount for more details.
+//
+// The value k = 0 always refers to l.head, i.e., the first rune of l; it does
+// not refer to index 0 of the backing array. It is the responsibility of this
+// method to compute the appropriate offsets into the circular FIFO and account
+// for possible wraparound based on l's current head and tail.
+// The caller must not account for these offsets. Otherwise, incorrect indexing
+// caused by double correction will almost always occur.
+func (l *Line) countUnescRunesInRange(k, n int) (count int) {
+	if s := (scanner{line: l}); s.slice(k, k+n) {
+		for ; n != 0 && s.count(&count); n-- {
+		}
+	}
+	return
+}
+
+// countUnescRunes returns the number of unescaped runes in l.
+func (l *Line) countUnescRunes() (count int) {
+	return l.countUnescRunesInRange(0, -1)
+}
+
+// countRunesInPrompt returns the number of unescaped runes in the input prompt.
+func (l *Line) countRunesInPrompt() (count int) {
 	if l == nil {
 		return 0
 	}
-	var g key.GlyphCount
+	var u key.UnescRuneCount
 	for _, r := range l.disp.Prompt() {
-		count = g.Scan(r)
+		count = u.Count(r)
 	}
 	return count
 }
@@ -103,7 +118,7 @@ func (l *Line) PromptCount() (count int) {
 // countToLeftWord returns then number of places from the cursor to the start of
 // the previous word.
 func (l *Line) countToLeftWord() int {
-	origPos := l.pos()
+	origPos := l.position()
 	if origPos == 0 {
 		return 0
 	}
@@ -128,7 +143,7 @@ func (l *Line) countToLeftWord() int {
 // countToRightWord returns then number of places from the cursor to the start
 // of the next word.
 func (l *Line) countToRightWord() int {
-	origPos := l.pos()
+	origPos := l.position()
 	head := int(l.head.Get())
 	eol := l.RuneCount()
 	pos := origPos
@@ -147,16 +162,21 @@ func (l *Line) countToRightWord() int {
 	return pos - origPos
 }
 
-func (l *Line) ErasePrevious(n int) (err error) {
+// EraseLeftRunes erases up to n runes to the left of the cursor.
+// Retained trailing runes are moved left in place of the runes erased.
+//
+// Appends sequences to the output buffer for repositioning the cursor and
+// overwriting the portion of text that changed.
+func (l *Line) EraseLeftRunes(n int) (err error) {
 	if n == 0 {
 		return
 	}
-	pos := l.pos()
+	pos := l.position()
 	if pos < n {
 		n = pos
 	}
 	pos -= n
-	if err = l.setPos(pos); err != nil {
+	if err = l.writePosition(pos); err != nil {
 		return err
 	}
 	// Overwrite leading runes with trailing runes
@@ -164,8 +184,8 @@ func (l *Line) ErasePrevious(n int) (err error) {
 	s := scanner{line: l}
 	if hs := h; s.slice(pos+n, -1) {
 		for {
-			r, ok := s.next()
-			if !ok {
+			r := s.next()
+			if r.IsError() {
 				break
 			}
 			l.Rune[(hs+uint32(pos))%config.RunesPerLine] = r
@@ -180,7 +200,7 @@ func (l *Line) ErasePrevious(n int) (err error) {
 		// Temporarily adjust head to rewrite only the changed portion of text.
 		l.head.Set(h + uint32(pos))
 		// Write out the text right-of the deletion, including the 0x20 erasors
-		if e := l.Queue(); e != nil {
+		if e := l.commit(); e != nil {
 			err = e
 		}
 		// Reset head back to the actual beginning of the line.
@@ -188,29 +208,24 @@ func (l *Line) ErasePrevious(n int) (err error) {
 	}
 	// Finally truncate tail, set final cursor position, and flush output buffer.
 	l.tail.Set(t)
-	l.setPos(pos)
+	if e := l.writePosition(pos); err == nil && e != nil {
+		err = e
+	}
 	return
 }
 
-// Reset sets the Line length to 0 and resets the cursor position.
-func (l *Line) Reset() *Line {
-	if l == nil {
-		return nil
-	}
-	l.posi.Set(0)
-	l.head.Set(0)
-	l.tail.Set(0)
-	return l
-}
-
-// pos returns the logical cursor position in the text of l.
-func (l *Line) pos() int {
+// position returns the logical cursor position in the text of l.
+//
+// At position 0, the cursor is placed on the first rune in l wherever the text
+// of l happens to be.
+func (l *Line) position() int {
 	return int(l.posi.Get())
 }
 
-// setPos appends key sequences to the output buffer that move the cursor to the
-// given logical position in the text, updating l and the cursor's coordinates.
-func (l *Line) setPos(pos int) (err error) {
+// writePosition appends key sequences to the output buffer that move the cursor
+// to the given logical position in the text, updating l's logical cursor
+// position and the cursor's X, Y coordinates.
+func (l *Line) writePosition(pos int) (err error) {
 	if pos < 0 {
 		pos = 0
 	}
@@ -219,7 +234,7 @@ func (l *Line) setPos(pos int) (err error) {
 		return
 	}
 	w := l.disp.Width()
-	x := pos + l.PromptCount()
+	x := pos + l.countRunesInPrompt()
 	y := x / w
 	x %= w
 	var (
@@ -242,9 +257,9 @@ func (l *Line) setPos(pos int) (err error) {
 	return l.curs.Queue(du, dd, dl, dr)
 }
 
-// SetPos overwrites the text in l and sets its Cursor's logical position.
-// If pos is negative, the Cursor is positioned at the end of the line.
-func (l *Line) SetPos(s []rune, pos int) (err error) {
+// WriteRunesAndPosition sets the text to s and logical cursor position to pos.
+// If pos is negative, the cursor is positioned after the last rune in s.
+func (l *Line) WriteRunesAndPosition(s []rune, pos int) (err error) {
 	if l == nil {
 		return ErrReceiverLineSet
 	}
@@ -263,11 +278,11 @@ func (l *Line) SetPos(s []rune, pos int) (err error) {
 		l.Rune[padLength] = utf8.Rune(key.Space)
 	}
 	if l.disp.Echo() {
-		if e := l.setPos(0); err == nil && e != nil {
+		if e := l.writePosition(0); err == nil && e != nil {
 			err = e
 		}
 		l.tail.Set(uint32(padLength))
-		if e := l.Queue(); err == nil && e != nil {
+		if e := l.commit(); err == nil && e != nil {
 			err = e
 		}
 	}
@@ -276,20 +291,21 @@ func (l *Line) SetPos(s []rune, pos int) (err error) {
 		// Position cursor at end of line if pos is negative.
 		pos = currCount
 	}
-	if e := l.setPos(pos); err == nil && e != nil {
+	if e := l.writePosition(pos); err == nil && e != nil {
 		err = e
 	}
 	return
 }
 
-// Set overwrites the text in l and positions the cursor at the end of the line.
-func (l *Line) Set(s []rune) (err error) {
-	return l.SetPos(s, -1)
+// WriteRunes overwrites the text in l and positions the cursor at the end of
+// the line.
+func (l *Line) WriteRunes(s []rune) (err error) {
+	return l.WriteRunesAndPosition(s, -1)
 }
 
-// Queue appends l to the output buffer and advances the cursor's current
-// position to the end of the line.
-func (l *Line) Queue() (err error) {
+// commit moves all buffered bytes in l to the output buffer and advances the
+// cursor's current position to the end of the line.
+func (l *Line) commit() (err error) {
 	width := l.disp.Width()
 	h, t := l.head.Get(), l.tail.Get()
 	for t-h > 0 {
@@ -311,7 +327,7 @@ func (l *Line) Queue() (err error) {
 		}
 		// Update the cursor's coordinates based on the number of valid, visible
 		// runes written to the output buffer.
-		if l.curs.Advance(l.glyphCount(0, seen)) {
+		if l.curs.Advance(l.countUnescRunesInRange(0, seen)) {
 			// If the cursor would write beyond the terminal width (line wrap), then
 			// also append CR+LF to the output buffer.
 			if _, err = l.ctrl.Out.Write(key.CRLF); err != nil {
@@ -329,7 +345,7 @@ func (l *Line) Queue() (err error) {
 //
 // If len(p) < l.Len(), and the UTF-8 encoding of the last rune being read
 // contains more bytes than the remaining space of p, then that rune will remain
-// unread in l, and err will be set to utf8.ErrOverflow.
+// unread in l, and a non-nil error will be returned.
 // func (l *Line) Read(p []byte) (n int, err error) {
 // 	if l == nil {
 // 		return 0, ErrReceiverLineRead
@@ -377,8 +393,8 @@ func (l *Line) Queue() (err error) {
 // copied.
 //
 // Write does not extend the length of l to make room for all of p. It will only
-// write to the free space in l and then return ErrOverflow if all of p could
-// not be copied.
+// write to the free space in l and then return an error if all of p could not
+// be copied.
 //
 // To overwrite any existing runes in l, call Reset before calling Write.
 func (l *Line) Write(p []byte) (n int, err error) {
@@ -419,12 +435,17 @@ func (l *Line) Write(p []byte) (n int, err error) {
 }
 
 type scanner struct {
-	line       *Line
+	line *Line
+	key.UnescRuneCount
 	head, tail uint32
 }
 
 func (s *scanner) reset() {
-	if s == nil || s.line == nil {
+	if s == nil {
+		return
+	}
+	s.Reset()
+	if s.line == nil {
 		s.head, s.tail = 0, 0
 	} else {
 		s.head, s.tail = s.line.head.Get(), s.line.tail.Get()
@@ -455,13 +476,18 @@ func (s *scanner) slice(lo, hi int) (ok bool) {
 	return true
 }
 
-func (s *scanner) next() (r utf8.Rune, ok bool) {
+func (s *scanner) next() (r utf8.Rune) {
 	if s != nil && s.line != nil && s.tail-s.head > 0 {
 		r = s.line.Rune[s.head%config.RunesPerLine]
 		s.head++
-		return r, true
+		return r
 	}
-	return key.Null, false
+	return key.Error
+}
+
+func (s *scanner) count(count *int) bool {
+	*count = s.Count(rune(s.next()))
+	return !s.IsError()
 }
 
 // Errors returned by Line methods.

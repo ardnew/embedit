@@ -5,6 +5,8 @@ import "unicode/utf8"
 // Rune extends type rune with unbuffered implementations of io.Copy interfaces.
 type Rune rune
 
+const RuneError Rune = utf8.RuneError
+
 // RunesLen returns the total number of bytes to encode each rune in p.
 // Each rune with an invalid UTF-8 encoding is ignored, i.e., its rune length is
 // assumed to be 0.
@@ -30,9 +32,19 @@ func (r *Rune) Len() (n int) {
 	return
 }
 
-// Equals returns true if and only if r is the same code point as a.
-func (r *Rune) Equals(a rune) bool {
+// Equals returns true if and only if r and a are the same UTF-8 code point.
+func (r *Rune) Equals(a Rune) bool {
+	return r.EqualsRune(a.Rune())
+}
+
+// EqualsRune returns true if and only if r and a are the same UTF-8 code point.
+func (r *Rune) EqualsRune(a rune) bool {
 	return rune(*r) == a
+}
+
+// IsError returns true if and only if r is equal to RuneError.
+func (r *Rune) IsError() bool {
+	return r.Equals(RuneError)
 }
 
 // Encode writes into p the UTF-8 encoding of r and returns the number of bytes

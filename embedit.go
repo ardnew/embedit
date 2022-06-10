@@ -8,11 +8,6 @@ import (
 	"github.com/ardnew/embedit/terminal/line"
 )
 
-// Types of errors returned by Embedit methods.
-type (
-	ErrReceiver string
-)
-
 // Embedit defines the state and configuration of a line-buffered, commandline
 // user interface with some capabilities of a modern terminal.
 //
@@ -61,5 +56,3 @@ func (e *Embedit) Line() *line.Line {
 	}
 	return e.term.Line()
 }
-
-func (e ErrReceiver) Error() string { return "embedit [receiver]: " + string(e) }

@@ -75,11 +75,11 @@ func Main() error {
 
 	em.Configure(embedit.Config{RW: rw, Width: 80, Height: 24})
 
-	em.Line().SetPos([]rune("hello there"), 7)
+	em.Line().WriteRunesAndPosition([]rune("hello there"), 4)
 	// time.Sleep(options.t)
-	em.Line().ErasePrevious(3)
+	em.Line().EraseLeftRunes(8)
 	// time.Sleep(options.t)
-	em.Line().Set([]rune("wat"))
+	em.Line().WriteRunes([]rune("wat"))
 	// time.Sleep(options.t)
 
 	// em.Line().SetPos([]rune("hello there"), 9)

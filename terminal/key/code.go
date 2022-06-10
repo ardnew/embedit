@@ -5,6 +5,8 @@ import (
 	"unicode/utf8"
 )
 
+const Error = utf8.RuneError
+
 // ASCII key constants
 const (
 	Null = iota
@@ -76,10 +78,10 @@ var (
 
 // Parse tries to parse a key sequence from b.
 // If successful, it returns the key and the remainder of b.
-// Otherwise, it returns utf8.RuneError.
+// Otherwise, it returns Error.
 func Parse(b []byte, pasting bool) (rune, []byte) {
 	if len(b) == 0 {
-		return utf8.RuneError, nil
+		return Error, nil
 	}
 
 	if !pasting {
@@ -111,7 +113,7 @@ func Parse(b []byte, pasting bool) (rune, []byte) {
 
 	if b[0] != Escape {
 		if !utf8.FullRune(b) {
-			return utf8.RuneError, b
+			return Error, b
 		}
 		r, l := utf8.DecodeRune(b)
 		return r, b[l:]
@@ -163,7 +165,7 @@ func Parse(b []byte, pasting bool) (rune, []byte) {
 		}
 	}
 
-	return utf8.RuneError, b
+	return Error, b
 }
 
 // IsPrintable returns true iff key is a visible, non-whitespace key.
@@ -171,37 +173,48 @@ func IsPrintable(key rune) bool {
 	return key >= Space && (key < Unknown || surrogateMask < key)
 }
 
-// GlyphCount provides methods for counting the number of visible glyphs in a
-// sequence of runes. Runes are provided one at a time to method Scan, and the
-// the current sum of visible glyphs is returned with each call.
+// UnescRuneCount provides methods for counting the number of unescaped runes in
+// a sequence of runes. Runes are provided one at a time to method Scan, and the
+// the current sum of unescaped runes is returned with each call.
 //
-// GlyphCount keeps track of whether or not otherwise-visible glyphs are bytes
-// in an escape sequence, and excludes those from the count.
+// UnescRuneCount keeps track of whether or not otherwise-visible glyphs are
+// runes within an escape sequence, and excludes those from the count.
 //
 // This object is used in cases where runes are not guaranteed to be stored
 // contiguously in an array, string, or slice (e.g., circular FIFO), so the
 // caller acts as a range operator.
-type GlyphCount struct {
+type UnescRuneCount struct {
 	count int
 	inEsc bool
+	isErr bool
 }
 
 // Reset sets count to 0 and escape sequence flag to false.
-func (g *GlyphCount) Reset() {
-	g.count = 0
-	g.inEsc = false
+func (u *UnescRuneCount) Reset() {
+	u.count = 0
+	u.inEsc = false
+	u.isErr = false
 }
 
-// Scan reads the given rune and then updates and returns the total number of
-// visible glyphs scanned so far.
-func (g *GlyphCount) Scan(r rune) int {
+// Count reads the given rune and then updates and returns the total number of
+// unescaped runes read so far.
+func (u *UnescRuneCount) Count(r rune) int {
 	switch {
-	case g.inEsc:
-		g.inEsc = (r < 'a' || 'z' < r) && (r < 'A' || 'Z' < r)
+	case u.isErr:
+		break // Stop counting once we read an Error
+	case u.inEsc:
+		u.inEsc = (r < 'a' || 'z' < r) && (r < 'A' || 'Z' < r)
 	case r == Escape:
-		g.inEsc = true
+		u.inEsc = true
+	case r == Error:
+		u.isErr = true // Never clears until Reset
 	default:
-		g.count++
+		u.count++
 	}
-	return g.count
+	return u.count
+}
+
+// IsError returns true if and only if an Error rune was read by Count.
+func (u *UnescRuneCount) IsError() bool {
+	return u.isErr
 }
