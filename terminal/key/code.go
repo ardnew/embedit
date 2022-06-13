@@ -66,9 +66,6 @@ const (
 	surrogateMask = Unknown | 0x03FF
 )
 
-// CRLF is the output line delimiter
-var CRLF = []byte{'\r', '\n'}
-
 // ANSI control sequences
 var (
 	csi        = []byte{Escape, '['}

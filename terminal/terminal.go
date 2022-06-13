@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"github.com/ardnew/embedit/sequence"
+	"github.com/ardnew/embedit/sequence/eol"
 	"github.com/ardnew/embedit/terminal/cursor"
 	"github.com/ardnew/embedit/terminal/display"
 	"github.com/ardnew/embedit/terminal/history"
@@ -33,7 +34,7 @@ func (t *Terminal) Configure(
 	t.rw = rw
 	t.history.Configure(
 		t.cursor.Configure(
-			t.control.Configure(t, t.in.Configure(), t.out.Configure()),
+			t.control.Configure(t, t.in.Configure(eol.CRLF), t.out.Configure(eol.CRLF)),
 			t.display.Configure(width, height, prompt, true),
 		))
 	return t.init()

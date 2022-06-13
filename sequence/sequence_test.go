@@ -9,6 +9,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/ardnew/embedit/config"
+	"github.com/ardnew/embedit/sequence/eol"
 	"github.com/ardnew/embedit/volatile"
 )
 
@@ -30,7 +31,7 @@ func TestSequence_Configure(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			if diff := cmp.Diff(tt.want, tt.s.Configure()); len(diff) > 0 {
+			if diff := cmp.Diff(tt.want, tt.s.Configure(eol.CRLF)); len(diff) > 0 {
 				t.Errorf("diff (-want +got):%s\n", diff)
 			}
 		})

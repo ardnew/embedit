@@ -1,9 +1,11 @@
 package sequence
 
 import (
+	"bytes"
 	"io"
 
 	"github.com/ardnew/embedit/config"
+	"github.com/ardnew/embedit/sequence/eol"
 	"github.com/ardnew/embedit/util"
 	"github.com/ardnew/embedit/volatile"
 )
@@ -13,11 +15,12 @@ type Sequence struct {
 	Byte  [config.BytesPerSequence]byte
 	head  volatile.Register32
 	tail  volatile.Register32
+	mode  eol.Mode
 	valid bool
 }
 
 // Configure initializes the Sequence configuration.
-func (s *Sequence) Configure() *Sequence {
+func (s *Sequence) Configure(mode eol.Mode) *Sequence {
 	if s == nil {
 		return nil
 	}
@@ -119,7 +122,7 @@ func (s *Sequence) readFrom(r io.Reader, lo, hi int) (n int, err error) {
 	//
 	// We can do a brief sanity check on the indices to prevent A/V errors, but no
 	// attempt is made to normalize, split the range into slices, or verify the
-	// range is starts at tail and spans only the free-space region.
+	// range starts at tail and spans only the free-space region.
 	if lo >= hi || lo < 0 || hi > config.BytesPerSequence {
 		// The above condition implies 0<=lo < hi<=N:
 		//   If lo<hi and lo>=0, then hi>0 (i.e.: 0<=lo<hi => hi>0).
@@ -219,6 +222,7 @@ func (s *Sequence) ReadFrom(r io.Reader) (n int64, err error) {
 func (s *Sequence) writeTo(w io.Writer, lo, hi int) (n int, err error) {
 	// The caller is responsible for coordinating calls to writeTo when the
 	// elements of s are not stored contiguously in the backing array.
+	//
 	// We can do a brief sanity check on the indices to prevent A/V errors,
 	// but no attempt is made to normalize or split the range into slices.
 	if lo >= hi || lo < 0 || hi > config.BytesPerSequence {
@@ -227,7 +231,46 @@ func (s *Sequence) writeTo(w io.Writer, lo, hi int) (n int, err error) {
 		//   If lo<hi and hi<=N, then lo<N (i.e.: lo<hi<=N => lo<N).
 		return 0, ErrArgumentWriteToRange
 	}
-	n, err = w.Write(s.Byte[lo:hi])
+	// Additional bytes written for EOL translation
+	// var added int
+	switch s.mode {
+	case eol.LF:
+		n, err = w.Write(s.Byte[lo:hi])
+	case eol.CRLF, eol.CR:
+		// We need to translate all LF bytes in our Sequence for the configured EOL.
+		// Repeatedly write up to the next LF in the given range, then write our
+		// configured EOL sequence, and repeat until the range has been covered.
+		//
+		// We will only return the number of bytes in our Sequence that were copied,
+		// not the actual number of bytes written; e.g., "hi\n" contains 3 bytes,
+		// but if EOL is CRLF, we will write "hi\r\n" (4 bytes), but return n=3.
+		for {
+			rem := hi - lo
+			if rem <= 0 {
+				break
+			}
+			off := bytes.IndexByte(s.Byte[lo:hi], '\n')
+			if off >= 0 {
+				rem = off
+			}
+			var no int
+			no, err = w.Write(s.Byte[lo : lo+rem])
+			n += no
+			if err != nil {
+				break
+			}
+			lo += rem
+			if off >= 0 {
+				if _, err = s.mode.WriteTo(w); err != nil {
+					break
+				}
+				// Regardless of the number of bytes in our EOL, we are only consuming
+				// a single LF byte from our Sequence. So to keep all of our counters
+				// happy, we'll just act like we've written a single byte for EOL.
+				n, lo = n+1, lo+1
+			}
+		}
+	}
 	// Check if we copied all bytes, regardless of error.
 	if n < s.Len() {
 		// Short write; not all bytes were copied. Adjust head to refer to the
@@ -347,6 +390,12 @@ func (s *Sequence) WriteByte(b byte) (err error) {
 	s.Byte[it] = b
 	s.tail.Set(t + 1)
 	return nil
+}
+
+// WriteEOL appends the configured end of line sequence to s.
+func (s *Sequence) WriteEOL() (n int, err error) {
+	i, err := s.mode.WriteTo(s)
+	return int(i), err
 }
 
 // Errors returned by Sequence methods.

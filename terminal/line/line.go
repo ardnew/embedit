@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/ardnew/embedit/config"
+	"github.com/ardnew/embedit/errors"
 	"github.com/ardnew/embedit/terminal/cursor"
 	"github.com/ardnew/embedit/terminal/display"
 	"github.com/ardnew/embedit/terminal/key"
@@ -203,9 +204,7 @@ func (l *Line) ErasePrevious(n int) (err error) {
 		// Temporarily adjust head to rewrite only the changed portion of text.
 		l.head.Set(h + uint32(pos))
 		// Write out the text right-of the deletion, including the 0x20 erasors.
-		if e := l.flush(); e != nil {
-			err = e
-		}
+		err = l.flush()
 		// Reset head back to the actual beginning of the line.
 		l.head.Set(h)
 	}
@@ -217,16 +216,45 @@ func (l *Line) ErasePrevious(n int) (err error) {
 	return
 }
 
+// kill appends a line-kill escape sequence to the output buffer that clears the
+// line from the current cursor position to the end of the line.
+func (l *Line) kill() (err error) {
+	l.ctrl.Out.WriteByte(key.Escape)
+	l.ctrl.Out.WriteByte('[')
+	l.ctrl.Out.WriteByte('K')
+	_, err = l.ctrl.Flush()
+	return
+}
+
 // insert inserts the given key at the current cursor position in l.
-func (l *Line) insert(key rune) (err error) {
-	t.line = t.line[:len(t.line)+1]
-	copy(t.line[t.pos+1:], t.line[t.pos:])
-	t.line[t.pos] = key
-	if t.echo {
-		t.writeLine(t.line[t.pos:])
+func (l *Line) Insert(key rune) (err error) {
+	if l == nil {
+		return &errors.ErrInvalidReceiver
 	}
-	t.pos++
-	t.moveCursorToPos(t.pos)
+	h, t := l.head.Get(), l.tail.Get()
+	if t-h >= config.RunesPerLine {
+		return io.ErrShortWrite
+	}
+	l.tail.Set(t + 1)
+	pos := l.position()
+	end := int(t)
+	for end-(int(h)+pos) >= 0 {
+		l.RuneAt(int(end) + 1).Set(*l.RuneAt(int(end)))
+		end--
+	}
+	l.RuneAt(int(h) + pos).SetRune(key)
+	if l.disp.Echo() {
+		// Temporarily adjust head to rewrite only the changed portion of text.
+		l.head.Set(h + uint32(pos))
+		// Write out the text right-of the insertion.
+		err = l.flush()
+		// Reset head back to the actual beginning of the line.
+		l.head.Set(h)
+	}
+	if e := l.moveCursorTo(int(pos) + 1); err == nil && e != nil {
+		err = e
+	}
+	return
 }
 
 // moveCursorTo appends key sequences to the output buffer that move the cursor
@@ -259,7 +287,7 @@ func (l *Line) moveCursorTo(pos int) (err error) {
 		dr = x - xc
 	}
 	_, _ = l.curs.Set(x, y)
-	return l.curs.Queue(du, dd, dl, dr)
+	return l.curs.Move(du, dd, dl, dr)
 }
 
 // position returns the logical cursor position in the text of l.
@@ -340,7 +368,7 @@ func (l *Line) flush() (err error) {
 		if l.curs.Update(l.glyphCount(0, seen)) {
 			// If the cursor would write beyond the terminal width (line wrap), then
 			// also append CR+LF to the output buffer.
-			if _, err = l.ctrl.Out.Write(key.CRLF); err != nil {
+			if _, err = l.ctrl.Out.WriteEOL(); err != nil {
 				return
 			}
 		}

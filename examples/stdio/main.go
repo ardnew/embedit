@@ -73,11 +73,14 @@ func Main() error {
 	defer f.Restore()
 
 	em.Configure(embedit.Config{RW: rw, Width: 80, Height: 24})
+	em.Line().Set([]rune(""))
 
 	for i := 0; i < options.n; i++ {
+		em.Line().Insert('A')
+		time.Sleep(options.t)
 		em.Line().SetPosition([]rune("hello there"), 4)
 		time.Sleep(options.t)
-		em.Line().ErasePrevious(8)
+		em.Line().Insert('X')
 		time.Sleep(options.t)
 		em.Line().Set([]rune("wat"))
 		time.Sleep(options.t)

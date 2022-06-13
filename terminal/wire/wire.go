@@ -14,6 +14,7 @@ type Writer interface {
 	io.Writer
 	io.ByteWriter
 	io.ReaderFrom
+	WriteEOL() (int, error)
 	Reset()
 }
 

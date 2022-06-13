@@ -103,14 +103,14 @@ func (c *Cursor) Update(places int) (eol bool) {
 	return places > 0 && x == 0
 }
 
-// Queue appends key sequences to the output buffer which will move the cursor
+// Move appends key sequences to the output buffer which will move the cursor
 // in the given directions by the given number of positions, relative to the
 // cursor's current position.
 //
-// Queue does not update the cursor's current X, Y coordinates. The caller is
-// responsible for updating the coordinates, which must be done every time Queue
+// Move does not update the cursor's current X, Y coordinates. The caller is
+// responsible for updating the coordinates, which must be done every time Move
 // is called.
-func (c *Cursor) Queue(up, down, left, right int) (err error) {
+func (c *Cursor) Move(up, down, left, right int) (err error) {
 	// 1 unit up can be expressed as ^[[A or ^[A
 	// 5 units up can be expressed as ^[[5A
 	// - - - - - - - - - - - - - - - - - - - -
