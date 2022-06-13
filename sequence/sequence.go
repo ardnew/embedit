@@ -56,11 +56,8 @@ func (s *Sequence) Reset() {
 // Read copies up to len(p) unread bytes from s to p and returns the number of
 // bytes copied.
 func (s *Sequence) Read(p []byte) (n int, err error) {
-	if s == nil {
-		return 0, ErrReceiverRead
-	}
-	if p == nil {
-		return 0, ErrArgumentRead
+	if s == nil || p == nil {
+		return 0, io.ErrUnexpectedEOF
 	}
 	var ns int
 	ns, n = s.Len(), len(p)
@@ -86,11 +83,8 @@ func (s *Sequence) Read(p []byte) (n int, err error) {
 // Write will only write to the free space in s and then return ErrOverflow if
 // all of p could not be copied.
 func (s *Sequence) Write(p []byte) (n int, err error) {
-	if s == nil {
-		return 0, ErrReceiverWrite
-	}
-	if p == nil {
-		return 0, ErrArgumentWrite
+	if s == nil || p == nil {
+		return 0, io.ErrUnexpectedEOF
 	}
 	np := len(p)
 	if np == 0 {
@@ -357,10 +351,6 @@ func (s *Sequence) WriteByte(b byte) (err error) {
 
 // Errors returned by Sequence methods.
 var (
-	ErrReceiverRead          error
-	ErrArgumentRead          error
-	ErrReceiverWrite         error
-	ErrArgumentWrite         error
 	ErrOverflowWrite         error
 	ErrArgumentReadFromRange error
 	ErrReceiverReadFrom      error

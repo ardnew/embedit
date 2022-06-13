@@ -5,7 +5,8 @@ import (
 	"unicode/utf8"
 )
 
-const Error = utf8.RuneError
+// const Error = utf8.RuneError
+const Error = utf8.MaxRune + 1
 
 // ASCII key constants
 const (
@@ -171,50 +172,4 @@ func Parse(b []byte, pasting bool) (rune, []byte) {
 // IsPrintable returns true iff key is a visible, non-whitespace key.
 func IsPrintable(key rune) bool {
 	return key >= Space && (key < Unknown || surrogateMask < key)
-}
-
-// UnescRuneCount provides methods for counting the number of unescaped runes in
-// a sequence of runes. Runes are provided one at a time to method Scan, and the
-// the current sum of unescaped runes is returned with each call.
-//
-// UnescRuneCount keeps track of whether or not otherwise-visible glyphs are
-// runes within an escape sequence, and excludes those from the count.
-//
-// This object is used in cases where runes are not guaranteed to be stored
-// contiguously in an array, string, or slice (e.g., circular FIFO), so the
-// caller acts as a range operator.
-type UnescRuneCount struct {
-	count int
-	inEsc bool
-	isErr bool
-}
-
-// Reset sets count to 0 and escape sequence flag to false.
-func (u *UnescRuneCount) Reset() {
-	u.count = 0
-	u.inEsc = false
-	u.isErr = false
-}
-
-// Count reads the given rune and then updates and returns the total number of
-// unescaped runes read so far.
-func (u *UnescRuneCount) Count(r rune) int {
-	switch {
-	case u.isErr:
-		break // Stop counting once we read an Error
-	case u.inEsc:
-		u.inEsc = (r < 'a' || 'z' < r) && (r < 'A' || 'Z' < r)
-	case r == Escape:
-		u.inEsc = true
-	case r == Error:
-		u.isErr = true // Never clears until Reset
-	default:
-		u.count++
-	}
-	return u.count
-}
-
-// IsError returns true if and only if an Error rune was read by Count.
-func (u *UnescRuneCount) IsError() bool {
-	return u.isErr
 }

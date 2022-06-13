@@ -77,11 +77,16 @@ func (c *Cursor) Set(x, y int) (X, Y int) {
 	return x, y
 }
 
-// Advance sets the X, Y coordinates based on the given number of places to move
+// Update sets the X, Y coordinates based on the given number of places to move
 // horizontally – relative to the current position – and returns true if and
 // only if the final cursor position is at the end of a line on the display.
-// Advance adjusts the X, Y coordinates to account for line-wrapping.
-func (c *Cursor) Advance(places int) (eol bool) {
+// Update adjusts the X, Y coordinates to account for line-wrapping.
+//
+// Update is called after runes have been copied to the output buffer, and the
+// cursor needs its coordinates updated to reflect the number of visible glyphs
+// that will be drawn to the display. It does not read or write from any output
+// buffer or device.
+func (c *Cursor) Update(places int) (eol bool) {
 	x, y := c.Get()
 	w := c.disp.Width()
 	x += places

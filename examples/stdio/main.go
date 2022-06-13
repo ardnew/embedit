@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"io"
 	"log"
 	"os"
@@ -27,8 +26,8 @@ var options = struct {
 	n int           // iterations
 	t time.Duration // step delay
 }{
-	n: 10,
-	t: 0 * time.Second,
+	n: 3,
+	t: 1 * time.Second,
 }
 
 // mainFunc is the prototype for a pseudo-"main" function. A function with this
@@ -69,25 +68,27 @@ func Main() error {
 	// input until the terminal sends it (typically on Return, CR/LF).
 	f := sys.MakeFdio(int(os.Stdin.Fd()))
 	if !f.Valid() || !f.Raw() {
-		return errors.New("cannot attach terminal to stdin")
+		return os.ErrInvalid
 	}
 	defer f.Restore()
 
 	em.Configure(embedit.Config{RW: rw, Width: 80, Height: 24})
 
-	em.Line().WriteRunesAndPosition([]rune("hello there"), 4)
-	// time.Sleep(options.t)
-	em.Line().EraseLeftRunes(8)
-	// time.Sleep(options.t)
-	em.Line().WriteRunes([]rune("wat"))
-	// time.Sleep(options.t)
+	for i := 0; i < options.n; i++ {
+		em.Line().SetPosition([]rune("hello there"), 4)
+		time.Sleep(options.t)
+		em.Line().ErasePrevious(8)
+		time.Sleep(options.t)
+		em.Line().Set([]rune("wat"))
+		time.Sleep(options.t)
 
-	// em.Line().SetPos([]rune("hello there"), 9)
-	// time.Sleep(options.t)
-	// em.Line().ErasePrevious(3)
-	// time.Sleep(options.t)
-	// em.Line().Set([]rune("wat"))
-	// time.Sleep(options.t)
+		// em.Line().SetPos([]rune("hello there"), 9)
+		// time.Sleep(options.t)
+		// em.Line().ErasePrevious(3)
+		// time.Sleep(options.t)
+		// em.Line().Set([]rune("wat"))
+		// time.Sleep(options.t)
+	}
 
 	return nil
 }

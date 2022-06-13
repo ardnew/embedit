@@ -2,6 +2,7 @@ package display
 
 import (
 	"github.com/ardnew/embedit/config"
+	"github.com/ardnew/embedit/text/utf8"
 	"github.com/ardnew/embedit/volatile"
 )
 
@@ -92,6 +93,14 @@ func (d *Display) Prompt() []rune {
 		return config.DefaultPrompt
 	}
 	return d.prompt
+}
+
+// PromptIterator returns the user input prompt as utf8.RuneIterator.
+func (d *Display) PromptIterator() utf8.Iterator {
+	if d == nil || d.prompt == nil {
+		return (*utf8.IterableRune)(&config.DefaultPrompt)
+	}
+	return (*utf8.IterableRune)(&d.prompt)
 }
 
 // SetPrompt sets the user input prompt.
