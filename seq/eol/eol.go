@@ -1,6 +1,10 @@
 package eol
 
-import "io"
+import (
+	"io"
+
+	"github.com/ardnew/embedit/seq/ascii"
+)
 
 // Mode defines end-of-line sequence conventions.
 type Mode byte
@@ -17,9 +21,9 @@ const Unix, DOS, Mac = LF, CRLF, CR
 
 // ASCII byte sequences of enumerated type Mode.
 var seq = [...][]byte{
-	{0x0A},       // LF
-	{0x0D, 0x0A}, // CRLF
-	{0x0D},       // CR
+	{ascii.LF},           // LF
+	{ascii.CR, ascii.LF}, // CRLF
+	{ascii.CR},           // CR
 }
 
 // WriteTo implements io.WriterTo.

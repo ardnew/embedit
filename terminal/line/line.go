@@ -2,15 +2,14 @@ package line
 
 import (
 	"bytes"
-	"io"
 
 	"github.com/ardnew/embedit/config"
 	"github.com/ardnew/embedit/errors"
-	"github.com/ardnew/embedit/sequence/key"
+	"github.com/ardnew/embedit/seq/key"
+	"github.com/ardnew/embedit/seq/utf8"
 	"github.com/ardnew/embedit/terminal/cursor"
 	"github.com/ardnew/embedit/terminal/display"
 	"github.com/ardnew/embedit/terminal/wire"
-	"github.com/ardnew/embedit/text/utf8"
 	"github.com/ardnew/embedit/volatile"
 )
 
@@ -59,6 +58,15 @@ func (l *Line) Reset() *Line {
 	return l
 }
 
+// LineFeed flushes all data to output device and resets the cursor, data, and
+// I/O buffers to begin processing a new line.
+func (l *Line) LineFeed() {
+	if l != nil && l.ctrl != nil && l.curs != nil {
+		_, _ = l.ctrl.Flush()
+		l.Reset().curs.LineFeed()
+	}
+}
+
 // Len returns the number of bytes in l.
 func (l *Line) Len() (n int) {
 	if l == nil {
@@ -72,6 +80,37 @@ func (l *Line) Len() (n int) {
 	return utf8.RunesLen(l.Rune[ih:it])
 }
 
+// Clone performs a deep copy of the receiver l by copying the values of each
+// field of l to c. Returns nil if either l or c are nil. Otherwise, returns c.
+//
+// Pointer fields in Line are copied shallowly; i.e., the pointer itself is
+// copied and not dereferenced.
+// func (l *Line) Clone(c *Line) *Line {
+// 	if l == nil || c == nil {
+// 		return nil
+// 	}
+// 	c.curs = l.curs
+// 	c.ctrl = l.ctrl
+// 	c.disp = l.disp
+// 	for i := 0; i < config.RunesPerLine; i++ {
+// 		c.Rune[i] = l.Rune[i]
+// 	}
+// 	c.posi.Set(l.posi.Get())
+// 	c.head.Set(l.head.Get())
+// 	c.tail.Set(l.tail.Get())
+// 	c.valid = l.valid
+// 	return c
+// }
+
+// RuneHead returns the head index of l. Implements utf8.Iterator.
+func (l *Line) RuneHead() uint32 { return l.head.Get() }
+
+// RuneTail returns the tail index of l. Implements utf8.Iterator.
+func (l *Line) RuneTail() uint32 { return l.tail.Get() }
+
+// RuneAt returns the Rune at index i in l. Implements utf8.Iterator.
+func (l *Line) RuneAt(i int) *utf8.Rune { return &l.Rune[i%config.RunesPerLine] }
+
 // RuneCount returns the total number of runes in l.
 func (l *Line) RuneCount() (count int) {
 	if l == nil {
@@ -80,47 +119,10 @@ func (l *Line) RuneCount() (count int) {
 	return int(l.tail.Get() - l.head.Get())
 }
 
-// RuneAt returns the Rune at index i in l. Implements utf8.Iterator.
-func (l *Line) RuneAt(i int) *utf8.Rune { return &l.Rune[i%config.RunesPerLine] }
-
-// RuneHead returns the head index of l. Implements utf8.Iterator.
-func (l *Line) RuneHead() uint32 { return l.head.Get() }
-
-// RuneTail returns the tail index of l. Implements utf8.Iterator.
-func (l *Line) RuneTail() uint32 { return l.tail.Get() }
-
-// glyphCount returns the number of runes in l starting at k and ending at k+n-1
-// that are not part of an escape sequence.
-// If n is negative, returns the number of unescaped runes in l starting at k.
-//
-// See type key.UnescRuneCount for more details.
-//
-// The value k = 0 always refers to l.head, i.e., the first rune of l; it does
-// not refer to index 0 of the backing array. It is the responsibility of this
-// method to compute the appropriate offsets into the circular FIFO and account
-// for possible wraparound based on l's current head and tail.
-// The caller must not account for these offsets. Otherwise, incorrect indexing
-// caused by double correction will almost always occur.
-func (l *Line) glyphCount(k, n int) (count int) {
-	if s := (utf8.Iterable{Iterator: l}); s.Slice(k, k+n) {
-		return s.GlyphCount()
-	}
-	return
-}
-
-// promptGlyphCount returns the number of runes in the user input prompt that
-// are not part of an escape sequence.
-func (l *Line) promptGlyphCount() (count int) {
-	if s := (utf8.Iterable{Iterator: l.disp.PromptIterator()}); s.Reset() {
-		return s.GlyphCount()
-	}
-	return
-}
-
-// countToLeftWord returns then number of places from the cursor to the start of
+// RuneCountToPrevWord returns then number of places from the cursor to the start of
 // the previous word.
-func (l *Line) countToLeftWord() int {
-	origPos := l.position()
+func (l *Line) RuneCountToPrevWord() int {
+	origPos := l.Position()
 	if origPos == 0 {
 		return 0
 	}
@@ -142,10 +144,10 @@ func (l *Line) countToLeftWord() int {
 	return origPos - pos
 }
 
-// countToRightWord returns then number of places from the cursor to the start
+// RuneCountToNextWord returns then number of places from the cursor to the start
 // of the next word.
-func (l *Line) countToRightWord() int {
-	origPos := l.position()
+func (l *Line) RuneCountToNextWord() int {
+	origPos := l.Position()
 	head := int(l.head.Get())
 	eol := l.RuneCount()
 	pos := origPos
@@ -164,24 +166,55 @@ func (l *Line) countToRightWord() int {
 	return pos - origPos
 }
 
-// ErasePrevious erases up to n previous runes from the current cursor position.
+// InsertRune inserts key at the current cursor position in l.
+func (l *Line) InsertRune(key rune) (err error) {
+	if l == nil {
+		return &errors.ErrInvalidReceiver
+	}
+	h, t := l.head.Get(), l.tail.Get()
+	if t-h >= config.RunesPerLine {
+		return &errors.ErrWriteOverflow
+	}
+	l.tail.Set(t + 1)
+	pos := l.Position()
+	end := int(t)
+	for end-(int(h)+pos) >= 0 {
+		l.RuneAt(int(end) + 1).Set(*l.RuneAt(int(end)))
+		end--
+	}
+	l.RuneAt(int(h) + pos).SetRune(key)
+	if l.disp.Echo() {
+		// Temporarily adjust head to rewrite only the changed portion of text.
+		l.head.Set(h + uint32(pos))
+		// Write out the text right-of the insertion.
+		err = l.flush()
+		// Reset head back to the actual beginning of the line.
+		l.head.Set(h)
+	}
+	if e := l.MoveTo(int(pos) + 1); err == nil && e != nil {
+		err = e
+	}
+	return
+}
+
+// ErasePrevRune erases up to n previous runes from the current cursor position.
 // Retained trailing runes are moved left in place of the runes erased.
 //
 // Appends sequences to the output buffer for repositioning the cursor and
 // overwriting the portion of text that changed.
-func (l *Line) ErasePrevious(n int) (err error) {
+func (l *Line) ErasePrevRune(n int) (err error) {
 	if l == nil {
-		return io.ErrUnexpectedEOF
+		return &errors.ErrInvalidReceiver
 	}
 	if n <= 0 {
 		return
 	}
-	pos := l.position()
+	pos := l.Position()
 	if pos < n {
 		n = pos
 	}
 	pos -= n
-	if err = l.moveCursorTo(pos); err != nil {
+	if err = l.MoveTo(pos); err != nil {
 		return err
 	}
 	// Overwrite leading runes with trailing runes
@@ -198,7 +231,7 @@ func (l *Line) ErasePrevious(n int) (err error) {
 	}
 	// Erase the trailing runes with spaces
 	for i := 0; i < n; i++ {
-		l.RuneAt(int(t + uint32(i))).Set(key.Space)
+		l.RuneAt(int(t + uint32(i))).Set(' ')
 	}
 	if l.disp.Echo() {
 		// Temporarily adjust head to rewrite only the changed portion of text.
@@ -210,70 +243,85 @@ func (l *Line) ErasePrevious(n int) (err error) {
 	}
 	// Finally truncate tail, set final cursor position, and flush output buffer.
 	l.tail.Set(t)
-	if e := l.moveCursorTo(pos); err == nil && e != nil {
+	if e := l.MoveTo(pos); err == nil && e != nil {
 		err = e
 	}
 	return
 }
 
-// kill appends a line-kill escape sequence to the output buffer that clears the
-// line from the current cursor position to the end of the line.
-func (l *Line) kill() (err error) {
-	l.ctrl.Out.WriteByte(key.Escape)
-	l.ctrl.Out.WriteByte('[')
-	l.ctrl.Out.WriteByte('K')
+// Kill appends an escape sequence to the output buffer that clears the line
+// from the current cursor position to the end of the line.
+func (l *Line) Kill() (err error) {
+	l.ctrl.Out.Write(key.KIL)
 	_, err = l.ctrl.Flush()
 	return
 }
 
-// insert inserts the given key at the current cursor position in l.
-func (l *Line) Insert(key rune) (err error) {
-	if l == nil {
-		return &errors.ErrInvalidReceiver
+func (l *Line) ClearScreen() (err error) {
+	return nil
+}
+
+// glyphCount returns the number of runes in l from k to k+n-1 that are not part
+// of an escape sequence. If n is negative, returns the number of unescaped
+// runes in l starting at k.
+//
+// See type Iterable (github.com/ardnew/embedit/seq/utf8) for more details.
+//
+// The value k = 0 always refers to l.head, i.e., the first rune of l; it does
+// not refer to index 0 of the backing array. It is the responsibility of this
+// method to compute the appropriate offsets into the circular FIFO and account
+// for possible wraparound based on l's current head and tail. The caller must
+// not account for these offsets. Otherwise, incorrect indexing caused by double
+// correction will almost always occur.
+func (l *Line) glyphCount(k, n int) (count int) {
+	if n >= 0 {
+		n += k
 	}
-	h, t := l.head.Get(), l.tail.Get()
-	if t-h >= config.RunesPerLine {
-		return io.ErrShortWrite
-	}
-	l.tail.Set(t + 1)
-	pos := l.position()
-	end := int(t)
-	for end-(int(h)+pos) >= 0 {
-		l.RuneAt(int(end) + 1).Set(*l.RuneAt(int(end)))
-		end--
-	}
-	l.RuneAt(int(h) + pos).SetRune(key)
-	if l.disp.Echo() {
-		// Temporarily adjust head to rewrite only the changed portion of text.
-		l.head.Set(h + uint32(pos))
-		// Write out the text right-of the insertion.
-		err = l.flush()
-		// Reset head back to the actual beginning of the line.
-		l.head.Set(h)
-	}
-	if e := l.moveCursorTo(int(pos) + 1); err == nil && e != nil {
-		err = e
+	if s := (utf8.Iterable{Iterator: l}); s.Slice(k, n) {
+		return s.GlyphCount()
 	}
 	return
 }
 
-// moveCursorTo appends key sequences to the output buffer that move the cursor
-// to the given logical position in the text, updating l's logical cursor
-// position and the cursor's X, Y coordinates.
-func (l *Line) moveCursorTo(pos int) (err error) {
+// GlyphCount returns the number of runes in l that are not part of an escape
+// sequence.
+func (l *Line) GlyphCount() (count int) {
+	return l.glyphCount(0, -1)
+}
+
+// GlyphCountInPrompt returns the number of runes in the user input prompt that
+// are not part of an escape sequence.
+func (l *Line) GlyphCountInPrompt() (count int) {
+	if s := (utf8.Iterable{Iterator: l.disp.PromptIterator()}); s.Reset() {
+		return s.GlyphCount()
+	}
+	return
+}
+
+// Position returns the logical cursor Position in the text of l.
+//
+// At Position 0, the cursor is located on the first rune in l wherever the text
+// of l happens to be.
+func (l *Line) Position() int {
+	return int(l.posi.Get())
+}
+
+// MoveTo appends key sequences to the output buffer that move the cursor to the
+// given logical position in the text, updating l's logical cursor position and
+// the cursor's X, Y coordinates.
+func (l *Line) MoveTo(pos int) (err error) {
 	if pos < 0 {
 		pos = 0
 	}
-	if pos == l.position() {
-		// Do not append anything to output buffer, cursor isn't moving.
-		return
+	if end := l.RuneCount(); pos > end {
+		pos = end
 	}
 	l.posi.Set(uint32(pos))
 	if !l.disp.Echo() {
 		return
 	}
 	w := l.disp.Width()
-	x := pos + l.promptGlyphCount()
+	x := pos + l.GlyphCountInPrompt()
 	y := x / w
 	x %= w
 	xc, yc := l.curs.Get()
@@ -294,27 +342,21 @@ func (l *Line) moveCursorTo(pos int) (err error) {
 	return l.curs.Move(du, dd, dl, dr)
 }
 
-// position returns the logical cursor position in the text of l.
-//
-// At position 0, the cursor is located on the first rune in l wherever the text
-// of l happens to be.
-func (l *Line) position() int {
-	return int(l.posi.Get())
+// Overwrite overwrites the text in l and positions the cursor at the end of the
+// line.
+func (l *Line) Overwrite(s []rune) (err error) {
+	return l.OverwriteAndMoveTo(s, -1)
 }
 
-// Set overwrites the text in l and positions the cursor at the end of the line.
-func (l *Line) Set(s []rune) (err error) {
-	return l.SetPosition(s, -1)
-}
-
-// SetPosition overwrites the text in l and sets logical cursor position to pos.
+// OverwriteAndMoveTo overwrites the text in l and then sets the logical cursor
+// position to pos.
 // If pos is negative, the cursor is positioned after the last rune in s.
-func (l *Line) SetPosition(s []rune, pos int) (err error) {
+func (l *Line) OverwriteAndMoveTo(s []rune, pos int) (err error) {
 	if l == nil {
-		return ErrReceiverLineSet
+		return &errors.ErrInvalidReceiver
 	}
 	if len(s) > config.RunesPerLine {
-		err = ErrOverflowLineSet
+		err = &errors.ErrWriteOverflow
 		s = s[:config.RunesPerLine]
 	}
 	prev := l.RuneCount()
@@ -325,10 +367,10 @@ func (l *Line) SetPosition(s []rune, pos int) (err error) {
 	}
 	tail := 0
 	for tail = curr; tail < prev; tail++ {
-		l.Rune[tail].Set(key.Space)
+		l.Rune[tail].Set(' ')
 	}
 	if l.disp.Echo() {
-		if e := l.moveCursorTo(0); err == nil && e != nil {
+		if e := l.MoveTo(0); err == nil && e != nil {
 			err = e
 		}
 		l.tail.Set(uint32(tail))
@@ -341,7 +383,7 @@ func (l *Line) SetPosition(s []rune, pos int) (err error) {
 		// Position cursor at end of line if pos is negative.
 		pos = curr
 	}
-	if e := l.moveCursorTo(pos); err == nil && e != nil {
+	if e := l.MoveTo(pos); err == nil && e != nil {
 		err = e
 	}
 	return
@@ -441,10 +483,10 @@ func (l *Line) flush() (err error) {
 // To overwrite any existing runes in l, call Reset before calling Write.
 func (l *Line) Write(p []byte) (n int, err error) {
 	if l == nil {
-		return 0, ErrReceiverLineWrite
+		return 0, &errors.ErrInvalidReceiver
 	}
 	if p == nil {
-		return 0, ErrArgumentLineWrite
+		return 0, &errors.ErrInvalidArgument
 	}
 	np := len(p)
 	if np == 0 {
@@ -471,18 +513,7 @@ func (l *Line) Write(p []byte) (n int, err error) {
 	}
 	l.tail.Set(t)
 	if r.Len() > 0 {
-		err = ErrOverflowLineWrite
+		err = &errors.ErrWriteOverflow
 	}
 	return
 }
-
-// Errors returned by Line methods.
-var (
-	ErrReceiverLineSet   error
-	ErrOverflowLineSet   error
-	ErrReceiverLineRead  error
-	ErrArgumentLineRead  error
-	ErrReceiverLineWrite error
-	ErrArgumentLineWrite error
-	ErrOverflowLineWrite error
-)

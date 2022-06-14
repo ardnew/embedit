@@ -2,7 +2,7 @@ package display
 
 import (
 	"github.com/ardnew/embedit/config"
-	"github.com/ardnew/embedit/text/utf8"
+	"github.com/ardnew/embedit/seq/utf8"
 	"github.com/ardnew/embedit/volatile"
 )
 

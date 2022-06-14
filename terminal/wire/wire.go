@@ -40,8 +40,20 @@ type Control struct {
 // MakeControl returns a Control object initialized with the given Controller
 // and I/O buffers.
 func (c *Control) Configure(ctrl Controller, in Reader, out Writer) *Control {
+	if c == nil {
+		return nil
+	}
 	c.Controller = ctrl
 	c.In = in
 	c.Out = out
+	return c
+}
+
+func (c *Control) Reset() *Control {
+	if c == nil {
+		return nil
+	}
+	c.In.Reset()
+	c.Out.Reset()
 	return c
 }

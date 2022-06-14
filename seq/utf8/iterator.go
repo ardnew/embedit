@@ -6,28 +6,28 @@ package utf8
 // This interface provides a []Rune accessor abstraction for structures that
 // store Rune-like data in some other type such as the native Go type []rune.
 type Iterator interface {
-	// RuneAt is the normal array-like accessor that returns a Rune for a given
-	// 0-based list index.
-	RuneAt(i int) *Rune
 	// RuneHead returns the index of the first Rune element.
 	RuneHead() uint32
 	// RuneTail returns the index of the last Rune element.
 	RuneTail() uint32
+	// RuneAt is the normal array-like accessor that returns a Rune for a given
+	// 0-based list index.
+	RuneAt(i int) *Rune
 }
 
 // IterableRune implements Iterator using the native Go type []rune.
 //
 // Use a construct like the following to convert an existing []rune to Iterable:
 //
-//   var aSlice = []rune{...} // Some global
-//   ...
-//	   it := Iterable{Iterator: (*IterableRune)(&aSlice)}
+//	  var aSlice = []rune{...} // Some global
+//	  ...
+//		   it := Iterable{Iterator: (*IterableRune)(&aSlice)}
 type IterableRune []rune
 
 // IterableRune methods implementing Iterator for native go type []rune.
-func (ir *IterableRune) RuneAt(i int) *Rune { return (*Rune)(&(*ir)[i]) }
 func (ir *IterableRune) RuneHead() uint32   { return 0 }
 func (ir *IterableRune) RuneTail() uint32   { return uint32(len(*ir)) }
+func (ir *IterableRune) RuneAt(i int) *Rune { return (*Rune)(&(*ir)[i]) }
 
 type Iterable struct {
 	Iterator
@@ -105,21 +105,21 @@ func (s *Iterable) Len() (n int) {
 // after the Iterator's first element (at RuneHead) will be excluded from the
 // count. An example of this limitation is shown and discussed below.
 //
-//   Three different Iterators over the same backing array ([9]rune) are shown:
+//	Three different Iterators over the same backing array ([9]rune) are shown:
 //
-//    [ 'H', 'l', 'o', ESC, '[', '2', 'D', 'e', 'l' ]   // Backing array
-//     ==== ==== ==== ____ ____ ____ ____ ==== ====
-//    { +1   +2   +3   --   --   --   --   +4   +5  }   // (1.) 5 glyphs
-//    { +1   +2   +3   --   -- }                        // (2.) 3 glyphs
-//                             { +1   +2   +3   +4  }   // (3.) 4 glyphs
+//	 [ 'H', 'l', 'o', ESC, '[', '2', 'D', 'e', 'l' ]   // Backing array
+//	  ==== ==== ==== ____ ____ ____ ____ ==== ====
+//	 { +1   +2   +3   --   --   --   --   +4   +5  }   // (1.) 5 glyphs
+//	 { +1   +2   +3   --   -- }                        // (2.) 3 glyphs
+//	                          { +1   +2   +3   +4  }   // (3.) 4 glyphs
 //
-//   The second and third Iterators together form the same sequence as the first
-//   Iterator, so their total number of glyphs (3 + 4) should logically equal
-//   the first (5).
+//	The second and third Iterators together form the same sequence as the first
+//	Iterator, so their total number of glyphs (3 + 4) should logically equal
+//	the first (5).
 //
-//   However, because the second and third Iterators' bounds were not aligned
-//   with the escape sequence's bounds, the final 2 runes of the escape sequence
-//   was erroneously counted as ordinary runes in the third Iterator.
+//	However, because the second and third Iterators' bounds were not aligned
+//	with the escape sequence's bounds, the final 2 runes of the escape sequence
+//	was erroneously counted as ordinary runes in the third Iterator.
 func (s *Iterable) GlyphCount() (count int) {
 	// Capture head/tail and restore after scanning
 	defer func(p *Iterable, h, t uint32) {

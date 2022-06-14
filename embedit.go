@@ -42,6 +42,14 @@ func (e *Embedit) init() *Embedit {
 	return e
 }
 
+// Terminal returns the terminal.
+func (e *Embedit) Terminal() *terminal.Terminal {
+	if e == nil {
+		return nil
+	}
+	return &e.term
+}
+
 func (e *Embedit) Cursor() *cursor.Cursor {
 	if e == nil {
 		return nil

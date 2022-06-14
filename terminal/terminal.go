@@ -2,11 +2,10 @@ package terminal
 
 import (
 	"io"
-	"unicode/utf8"
 
-	"github.com/ardnew/embedit/sequence"
-	"github.com/ardnew/embedit/sequence/eol"
-	"github.com/ardnew/embedit/sequence/key"
+	"github.com/ardnew/embedit/seq"
+	"github.com/ardnew/embedit/seq/eol"
+	"github.com/ardnew/embedit/seq/key"
 	"github.com/ardnew/embedit/terminal/clipboard/paste"
 	"github.com/ardnew/embedit/terminal/cursor"
 	"github.com/ardnew/embedit/terminal/display"
@@ -26,8 +25,8 @@ type Terminal struct {
 	display display.Display
 	history history.History
 
-	in  sequence.Sequence
-	out sequence.Sequence
+	in  seq.Buffer
+	out seq.Buffer
 
 	paste paste.State
 
@@ -52,7 +51,7 @@ func (t *Terminal) Configure(
 func (t *Terminal) init() *Terminal {
 	t.valid = true
 	t.paste = paste.Inactive
-	t.Line().Set(nil)
+	t.Line().Overwrite(nil)
 	return t
 }
 
@@ -79,136 +78,140 @@ func (t *Terminal) Line() *line.Line {
 // PressKey processes a given keypress on the current line.
 func (t *Terminal) PressKey(k rune) (ok bool) {
 	l := t.Line()
-	if t.pasteActive && k != key.Enter {
-		t.addKeyToLine(k)
-		return
+	if t.paste.IsActive() && k != key.Enter {
+		return l.InsertRune(k) == nil
 	}
+
+	pos := l.Position()
+	siz := l.RuneCount()
+	// viz := l.GlyphCount()
 
 	switch k {
 	case key.Backspace:
-		if t.pos == 0 {
+		if pos == 0 {
 			return
 		}
-		t.eraseNPreviousChars(1)
+		ok = l.ErasePrevRune(1) == nil
+
 	case key.AltLeft:
-		// move left by a word.
-		t.pos -= t.countToLeftWord()
-		t.moveCursorToPos(t.pos)
+		// Move left by 1 word.
+		ok = l.MoveTo(pos-l.RuneCountToPrevWord()) == nil
+
 	case key.AltRight:
-		// move right by a word.
-		t.pos += t.countToRightWord()
-		t.moveCursorToPos(t.pos)
+		// Move right by 1 word.
+		ok = l.MoveTo(pos+l.RuneCountToNextWord()) == nil
+
 	case key.Left:
-		if t.pos == 0 {
+		if pos == 0 {
 			return
 		}
-		t.pos--
-		t.moveCursorToPos(t.pos)
+		ok = l.MoveTo(pos-1) == nil
+
 	case key.Right:
-		if t.pos == len(t.line) {
+		if pos == siz {
 			return
 		}
-		t.pos++
-		t.moveCursorToPos(t.pos)
+		ok = l.MoveTo(pos+1) == nil
+
 	case key.Home:
-		if t.pos == 0 {
+		if pos == 0 {
 			return
 		}
-		t.pos = 0
-		t.moveCursorToPos(t.pos)
+		ok = l.MoveTo(0) == nil
+
 	case key.End:
-		if t.pos == len(t.line) {
+		if pos == siz {
 			return
 		}
-		t.pos = len(t.line)
-		t.moveCursorToPos(t.pos)
-	case key.Up:
-		entry, ok := t.history.NthPreviousEntry(t.historyIndex + 1)
-		if !ok {
-			return "", false
-		}
-		if t.historyIndex == -1 {
-			t.historyPending = string(t.line)
-		}
-		t.historyIndex++
-		runes := []rune(entry)
-		t.setLine(runes, len(runes))
-	case key.Down:
-		switch t.historyIndex {
-		case -1:
-			return
-		case 0:
-			runes := []rune(t.historyPending)
-			t.setLine(runes, len(runes))
-			t.historyIndex--
-		default:
-			entry, ok := t.history.NthPreviousEntry(t.historyIndex - 1)
-			if ok {
-				t.historyIndex--
+		ok = l.MoveTo(siz) == nil
+
+		/*
+			case key.Up:
+				entry, ok := t.history.NthPreviousEntry(t.historyIndex + 1)
+				if !ok {
+					return "", false
+				}
+				if t.historyIndex == -1 {
+					t.historyPending = string(t.line)
+				}
+				t.historyIndex++
 				runes := []rune(entry)
 				t.setLine(runes, len(runes))
-			}
-		}
+			case key.Down:
+				switch t.historyIndex {
+				case -1:
+					return
+				case 0:
+					runes := []rune(t.historyPending)
+					t.setLine(runes, len(runes))
+					t.historyIndex--
+				default:
+					entry, ok := t.history.NthPreviousEntry(t.historyIndex - 1)
+					if ok {
+						t.historyIndex--
+						runes := []rune(entry)
+						t.setLine(runes, len(runes))
+					}
+				}
+		*/
+
 	case key.Enter:
-		t.moveCursorToPos(len(t.line))
-		t.queue([]rune("\r\n"))
-		line = string(t.line)
-		ok = true
-		t.line = t.line[:0]
-		t.pos = 0
-		t.cursorX = 0
-		t.cursorY = 0
-		t.maxLine = 0
+		l.MoveTo(siz)
+		t.out.WriteEOL()
+		l.LineFeed()
+
 	case key.DeleteWord:
 		// Delete zero or more spaces and then one or more characters.
-		t.eraseNPreviousChars(t.countToLeftWord())
+		l.ErasePrevRune(l.RuneCountToPrevWord())
+
 	case key.DeleteLine:
 		// Delete everything from the current cursor position to the
 		// end of line.
-		for i := t.pos; i < len(t.line); i++ {
-			t.queue(space)
-			t.advanceCursor(1)
-		}
-		t.line = t.line[:t.pos]
-		t.moveCursorToPos(t.pos)
+		l.MoveTo(siz)
+		l.ErasePrevRune(siz - pos)
+
 	case key.CtrlD:
 		// Erase the character under the current position.
 		// The EOF case when the line is empty is handled in
 		// readLine().
-		if t.pos < len(t.line) {
-			t.pos++
-			t.eraseNPreviousChars(1)
+		if pos < siz {
+			l.MoveTo(pos + 1)
+			l.ErasePrevRune(1)
 		}
+
 	case key.CtrlU:
-		t.eraseNPreviousChars(t.pos)
-	case key.ClearScreen:
-		// Erases the screen and moves the cursor to the home position.
-		t.queue([]rune("\x1b[2J\x1b[H"))
-		t.queue(t.prompt)
-		t.cursorX, t.cursorY = 0, 0
-		t.advanceCursor(visualLength(t.prompt))
-		t.setLine(t.line, t.pos)
-	default:
-		if t.AutoCompleteCallback != nil {
-			prefix := string(t.line[:t.pos])
-			suffix := string(t.line[t.pos:])
+		l.ErasePrevRune(pos)
+		/*
+			case key.ClearScreen:
+				// Erase the screen and move the cursor to the home position.
+				t.queue([]rune("\x1b[2J\x1b[H"))
+				t.queue(t.prompt)
+				t.cursorX, t.cursorY = 0, 0
+				t.advanceCursor(visualLength(t.prompt))
+				t.setLine(t.line, pos)
 
-			t.lock.Unlock()
-			newLine, newPos, completeOk := t.AutoCompleteCallback(prefix+suffix, len(prefix), k)
-			t.lock.Lock()
+			default:
+				if t.AutoCompleteCallback != nil {
+					prefix := string(t.line[:pos])
+					suffix := string(t.line[pos:])
 
-			if completeOk {
-				t.setLine([]rune(newLine), utf8.RuneCount([]byte(newLine)[:newPos]))
-				return
-			}
-		}
-		if !isPrintable(k) {
-			return
-		}
-		if len(t.line) == maxLineLength {
-			return
-		}
-		t.addKeyToLine(k)
+					t.lock.Unlock()
+					newLine, newPos, completeOk := t.AutoCompleteCallback(prefix+suffix, len(prefix), k)
+					t.lock.Lock()
+
+					if completeOk {
+						t.setLine([]rune(newLine), utf8.RuneCount([]byte(newLine)[:newPos]))
+						return
+					}
+				}
+				if !isPrintable(k) {
+					return
+				}
+				if len(t.line) == maxLineLength {
+					return
+				}
+				t.addKeyToLine(k)
+		*/
 	}
 	return
 }

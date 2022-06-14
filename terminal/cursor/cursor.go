@@ -1,10 +1,10 @@
 package cursor
 
 import (
-	"github.com/ardnew/embedit/sequence/key"
+	"github.com/ardnew/embedit/seq/ascii"
+	"github.com/ardnew/embedit/seq/key"
 	"github.com/ardnew/embedit/terminal/display"
 	"github.com/ardnew/embedit/terminal/wire"
-	"github.com/ardnew/embedit/text/ascii"
 	"github.com/ardnew/embedit/volatile"
 )
 
@@ -29,9 +29,7 @@ func (c *Cursor) Configure(ctrl *wire.Control, disp *display.Display) *Cursor {
 // init initializes the state of a configured Cursor.
 func (c *Cursor) init() *Cursor {
 	c.valid = true
-	c.maxY.Set(0)
-	_, _ = c.Set(0, 0)
-	return c
+	return c.Reset()
 }
 
 // Reset resets the X, Y, and MaxY coordinates.
@@ -39,6 +37,14 @@ func (c *Cursor) Reset() *Cursor {
 	c.maxY.Set(0)
 	_, _ = c.Set(0, 0)
 	return c
+}
+
+// LineFeed resets the X, Y, and MaxY coordinates and resets the I/O control
+// buffers to begin processing a new line.
+func (c *Cursor) LineFeed() {
+	if c != nil && c.ctrl != nil {
+		_ = c.Reset().ctrl.Reset()
+	}
 }
 
 func (c *Cursor) Control() *wire.Control    { return c.ctrl }

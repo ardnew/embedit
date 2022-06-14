@@ -9,7 +9,10 @@ const (
 	// LinesPerHistory defines the maximum number of lines stored in history.
 	// Old lines are discarded as more than LinesPerHistory are added.
 	LinesPerHistory = 32
-	// BytesPerSequence defines the maximum number of bytes in a buffer used for
+	// BytesPerBuffer defines the maximum number of bytes in a buffer used for
 	// reading/writing terminal control/data byte sequences.
-	BytesPerSequence = 4 * RunesPerLine // 4-byte maximum UTF-8 rune size
+	BytesPerBuffer = 4 * RunesPerLine // 4-byte maximum UTF-8 rune size
+	// MaxBytesPerKey defines the maximum number of bytes in a keycode sequence.
+	// This is the size of the buffer used for parsing a key from an I/O buffer.
+	MaxBytesPerKey = 8
 )

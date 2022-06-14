@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ardnew/embedit"
+	"github.com/ardnew/embedit/seq/key"
 	"github.com/ardnew/embedit/sys"
 )
 
@@ -73,16 +74,23 @@ func Main() error {
 	defer f.Restore()
 
 	em.Configure(embedit.Config{RW: rw, Width: 80, Height: 24})
-	em.Line().Set([]rune(""))
 
 	for i := 0; i < options.n; i++ {
-		em.Line().Insert('A')
+		em.Line().InsertRune('A')
 		time.Sleep(options.t)
-		em.Line().SetPosition([]rune("hello there"), 4)
+		em.Line().OverwriteAndMoveTo([]rune("hello there"), 4)
 		time.Sleep(options.t)
-		em.Line().Insert('X')
+		em.Terminal().PressKey(key.Right)
+		em.Terminal().PressKey(key.Right)
+		em.Terminal().PressKey(key.Right)
+		em.Terminal().PressKey(key.Home)
+		em.Terminal().PressKey(key.End)
+		em.Terminal().PressKey(key.Left)
+		em.Terminal().PressKey(key.Left)
+		em.Terminal().PressKey(key.Left)
+		em.Line().InsertRune('X')
 		time.Sleep(options.t)
-		em.Line().Set([]rune("wat"))
+		em.Line().Overwrite([]rune("wat"))
 		time.Sleep(options.t)
 
 		// em.Line().SetPos([]rune("hello there"), 9)

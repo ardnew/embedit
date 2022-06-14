@@ -47,18 +47,23 @@ func (h *History) Len() int {
 	return int(h.size.Get())
 }
 
-// Add appends a Line to the History.
+// Add appends the pending Line to History.
 // If the History is filled to capacity, the oldest Line is discarded.
-func (h *History) Add(ln line.Line) {
+func (h *History) Add() {
 	if h == nil {
 		return
 	}
 	head := (h.head.Get() + 1) % config.LinesPerHistory
 	h.head.Set(head)
-	h.line[head] = ln
+	// This copies the elements in line.Rune, and it copies the pointer fields by
+	// value; i.e., each pointer itself is copied and not dereferenced.
+	h.line[head] = h.pend
+	// Now it is safe to modify pend without affecting its "snapshot" in h.
 	if size := h.size.Get(); size < config.LinesPerHistory {
 		h.size.Set(size + 1)
 	}
+	// Reset the cursor, data, and I/O buffers.
+	h.pend.LineFeed()
 }
 
 // Get returns the Line passed to the n'th previous call to Add.
