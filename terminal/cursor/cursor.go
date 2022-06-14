@@ -1,8 +1,8 @@
 package cursor
 
 import (
+	"github.com/ardnew/embedit/sequence/key"
 	"github.com/ardnew/embedit/terminal/display"
-	"github.com/ardnew/embedit/terminal/key"
 	"github.com/ardnew/embedit/terminal/wire"
 	"github.com/ardnew/embedit/text/ascii"
 	"github.com/ardnew/embedit/volatile"

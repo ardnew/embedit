@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/ardnew/embedit/config"
+	"github.com/ardnew/embedit/errors"
 	"github.com/ardnew/embedit/sequence/eol"
 	"github.com/ardnew/embedit/util"
 	"github.com/ardnew/embedit/volatile"
@@ -59,8 +60,11 @@ func (s *Sequence) Reset() {
 // Read copies up to len(p) unread bytes from s to p and returns the number of
 // bytes copied.
 func (s *Sequence) Read(p []byte) (n int, err error) {
-	if s == nil || p == nil {
-		return 0, io.ErrUnexpectedEOF
+	if s == nil {
+		return 0, &errors.ErrInvalidReceiver
+	}
+	if p == nil {
+		return 0, &errors.ErrInvalidArgument
 	}
 	var ns int
 	ns, n = s.Len(), len(p)
@@ -83,11 +87,14 @@ func (s *Sequence) Read(p []byte) (n int, err error) {
 // Write appends up to len(p) bytes from p to s and returns the number of bytes
 // copied.
 //
-// Write will only write to the free space in s and then return ErrOverflow if
-// all of p could not be copied.
+// Write will only write to the free space in s and then return ErrWriteOverflow
+// if all of p could not be copied.
 func (s *Sequence) Write(p []byte) (n int, err error) {
-	if s == nil || p == nil {
-		return 0, io.ErrUnexpectedEOF
+	if s == nil {
+		return 0, &errors.ErrInvalidReceiver
+	}
+	if p == nil {
+		return 0, &errors.ErrInvalidArgument
 	}
 	np := len(p)
 	if np == 0 {
@@ -111,7 +118,7 @@ func (s *Sequence) Write(p []byte) (n int, err error) {
 		s.tail.Set(t)
 	}
 	if n < np {
-		err = ErrOverflowWrite
+		err = &errors.ErrWriteOverflow
 	}
 	return
 }
@@ -127,7 +134,7 @@ func (s *Sequence) readFrom(r io.Reader, lo, hi int) (n int, err error) {
 		// The above condition implies 0<=lo < hi<=N:
 		//   If lo<hi and lo>=0, then hi>0 (i.e.: 0<=lo<hi => hi>0).
 		//   If lo<hi and hi<=N, then lo<N (i.e.: lo<hi<=N => lo<N).
-		return 0, ErrArgumentReadFromRange
+		return 0, &errors.ErrOutOfRange
 	}
 	// Catch any attempt to return io.EOF and return nil instead.
 	// See documentation on io.ReaderFrom, and io.Copy.
@@ -148,10 +155,10 @@ func (s *Sequence) readFrom(r io.Reader, lo, hi int) (n int, err error) {
 // if both are implemented as buffers of physical memory.
 func (s *Sequence) ReadFrom(r io.Reader) (n int64, err error) {
 	if s == nil {
-		return 0, ErrReceiverReadFrom
+		return 0, &errors.ErrInvalidReceiver
 	}
 	if r == nil {
-		return 0, ErrArgumentReadFrom
+		return 0, &errors.ErrInvalidArgument
 	}
 	h, t := s.head.Get(), s.tail.Get()
 	if h == t {
@@ -169,7 +176,7 @@ func (s *Sequence) ReadFrom(r io.Reader) (n int64, err error) {
 	// and return an error. Opting for the latter so that no bytes are lost, and
 	// it gives the caller an opportunity to remedy the situation.
 	if it == ih {
-		return 0, ErrOverflowReadFrom
+		return 0, &errors.ErrReadOverflow
 	}
 	// When first-in (head) element is located at index 0 (i.e., the start of the
 	// backing array), then the unused space spans exactly one region only;
@@ -229,7 +236,7 @@ func (s *Sequence) writeTo(w io.Writer, lo, hi int) (n int, err error) {
 		// The above condition implies 0<=lo < hi<=N:
 		//   If lo<hi and lo>=0, then hi>0 (i.e.: 0<=lo<hi => hi>0).
 		//   If lo<hi and hi<=N, then lo<N (i.e.: lo<hi<=N => lo<N).
-		return 0, ErrArgumentWriteToRange
+		return 0, &errors.ErrOutOfRange
 	}
 	// Additional bytes written for EOL translation
 	// var added int
@@ -243,7 +250,7 @@ func (s *Sequence) writeTo(w io.Writer, lo, hi int) (n int, err error) {
 		//
 		// We will only return the number of bytes in our Sequence that were copied,
 		// not the actual number of bytes written; e.g., "hi\n" contains 3 bytes,
-		// but if EOL is CRLF, we will write "hi\r\n" (4 bytes), but return n=3.
+		// but if EOL is CRLF, we will write "hi\r\n" (4 bytes) and return n=3.
 		for {
 			rem := hi - lo
 			if rem <= 0 {
@@ -290,10 +297,10 @@ func (s *Sequence) writeTo(w io.Writer, lo, hi int) (n int, err error) {
 // if both are implemented as buffers of physical memory.
 func (s *Sequence) WriteTo(w io.Writer) (n int64, err error) {
 	if s == nil {
-		return 0, ErrReceiverWriteTo
+		return 0, &errors.ErrInvalidReceiver
 	}
 	if w == nil {
-		return 0, ErrArgumentWriteTo
+		return 0, &errors.ErrInvalidArgument
 	}
 	h, t := s.head.Get(), s.tail.Get()
 	if h == t {
@@ -347,7 +354,7 @@ func (s *Sequence) WriteTo(w io.Writer) (n int64, err error) {
 // In particular, ReadByte never returns a byte read from s and error == io.EOF.
 func (s *Sequence) ReadByte() (b byte, err error) {
 	if s == nil {
-		return 0, ErrReceiverReadByte
+		return 0, &errors.ErrInvalidReceiver
 	}
 	h, t := s.head.Get(), s.tail.Get()
 	switch h {
@@ -364,10 +371,10 @@ func (s *Sequence) ReadByte() (b byte, err error) {
 }
 
 // WriteByte appends b to s and returns nil.
-// If s is full, returns ErrOverflow.
+// If s is full, returns ErrWriteOverflow.
 func (s *Sequence) WriteByte(b byte) (err error) {
 	if s == nil {
-		return ErrReceiverWriteByte
+		return &errors.ErrInvalidReceiver
 	}
 	h, t := s.head.Get(), s.tail.Get()
 	if h == t {
@@ -384,7 +391,7 @@ func (s *Sequence) WriteByte(b byte) (err error) {
 	// for the latter so that no byte is lost, and it gives the caller an
 	// opportunity to remedy the situation.
 	if it == h%config.BytesPerSequence {
-		return ErrOverflowWriteByte
+		return &errors.ErrWriteOverflow
 	}
 	// Write the byte into tail position and increment length by 1.
 	s.Byte[it] = b
@@ -397,18 +404,3 @@ func (s *Sequence) WriteEOL() (n int, err error) {
 	i, err := s.mode.WriteTo(s)
 	return int(i), err
 }
-
-// Errors returned by Sequence methods.
-var (
-	ErrOverflowWrite         error
-	ErrArgumentReadFromRange error
-	ErrReceiverReadFrom      error
-	ErrArgumentReadFrom      error
-	ErrOverflowReadFrom      error
-	ErrArgumentWriteToRange  error
-	ErrReceiverWriteTo       error
-	ErrArgumentWriteTo       error
-	ErrReceiverReadByte      error
-	ErrReceiverWriteByte     error
-	ErrOverflowWriteByte     error
-)

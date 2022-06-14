@@ -6,9 +6,9 @@ import (
 
 	"github.com/ardnew/embedit/config"
 	"github.com/ardnew/embedit/errors"
+	"github.com/ardnew/embedit/sequence/key"
 	"github.com/ardnew/embedit/terminal/cursor"
 	"github.com/ardnew/embedit/terminal/display"
-	"github.com/ardnew/embedit/terminal/key"
 	"github.com/ardnew/embedit/terminal/wire"
 	"github.com/ardnew/embedit/text/utf8"
 	"github.com/ardnew/embedit/volatile"
@@ -263,6 +263,10 @@ func (l *Line) Insert(key rune) (err error) {
 func (l *Line) moveCursorTo(pos int) (err error) {
 	if pos < 0 {
 		pos = 0
+	}
+	if pos == l.position() {
+		// Do not append anything to output buffer, cursor isn't moving.
+		return
 	}
 	l.posi.Set(uint32(pos))
 	if !l.disp.Echo() {
