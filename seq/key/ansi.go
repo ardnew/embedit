@@ -73,12 +73,13 @@ const (
 
 // Escape sequences.
 var (
-	CSI = []byte{Escape, '['}                             // Ctrl seq intro
-	SOP = []byte{Escape, '[', '2', '0', '0', '~'}         // Start of paste
-	EOP = []byte{Escape, '[', '2', '0', '1', '~'}         // End of paste
-	DEL = []byte{' ', Escape, '[', 'D'}                   // Delete next rune
-	CLS = []byte{Escape, '[', '2', 'J', Escape, '[', 'H'} // Clear screen
-	KIL = []byte{Escape, '[', 'K'}                        // Clear line right
+	CSI = []byte{Escape, '['}                     // Ctrl seq intro
+	SOP = []byte{Escape, '[', '2', '0', '0', '~'} // Start of paste
+	EOP = []byte{Escape, '[', '2', '0', '1', '~'} // End of paste
+	DEL = []byte{' ', Escape, '[', 'D'}           // Delete next rune
+	CLS = []byte{Escape, '[', '2', 'J'}           // Clear screen
+	XY0 = []byte{Escape, '[', 'H'}                // Set cursor X=1 Y=1
+	KIL = []byte{Escape, '[', 'K'}                // Clear line right
 )
 
 // IsPrintable returns true iff key is a visible, non-whitespace key.

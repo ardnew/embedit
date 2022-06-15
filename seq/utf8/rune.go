@@ -1,8 +1,9 @@
 package utf8
 
 import (
-	"io"
 	"unicode/utf8"
+
+	"github.com/ardnew/embedit/errors"
 )
 
 // Rune extends type rune with unbuffered implementations of io.Copy interfaces.
@@ -13,7 +14,7 @@ type Rune rune
 // The conventional value utf8.RuneError is not used because it is considered
 // a valid rune by package unicode/utf8 and returns 3-bytes from RuneLen.
 // Using a proper invalid UTF-8 value allows us to catch invalid runes and
-// strings in a sane manner.
+// strings in a sane manner without potentially using up precious bytes.
 var invalid Rune = utf8.MaxRune + 1
 
 // Rune returns r as a Go native rune type.
@@ -71,18 +72,18 @@ func (r *Rune) IsError() bool {
 }
 
 // Encode writes into p the UTF-8 encoding of r and returns the number of bytes
-// written.
-// Returns 0, ErrOverflow if p is not large enough to hold the encoding of r.
+// written. Returns 0, ErrWriteOverflow if p is not large enough to hold the
+// encoding of r.
 func (r *Rune) Encode(p []byte) (n int, err error) {
 	if n = r.Len(); n == 0 {
-		return 0, io.ErrUnexpectedEOF
+		return 0, &errors.ErrInvalidReceiver
 	}
 	if p == nil {
-		return 0, io.ErrUnexpectedEOF
+		return 0, &errors.ErrInvalidArgument
 	}
 	pn := len(p)
 	if n > pn {
-		return 0, io.ErrShortBuffer
+		return 0, &errors.ErrWriteOverflow
 	}
 	return utf8.EncodeRune(p, rune(*r)), nil
 }
