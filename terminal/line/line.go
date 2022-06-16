@@ -252,13 +252,22 @@ func (l *Line) ErasePrevRune(n int) (err error) {
 // Kill appends an escape sequence to the output buffer that clears the line
 // from the current cursor position to the end of the line.
 func (l *Line) Kill() (err error) {
-	l.ctrl.Out.Write(key.KIL)
-	_, err = l.ctrl.Flush()
+	_, err = l.ctrl.Out.Write(key.KIL)
+	if _, e := l.ctrl.Flush(); err == nil && e != nil {
+		err = e
+	}
 	return
 }
 
 func (l *Line) ClearScreen() (err error) {
-	return nil
+	_, err = l.ctrl.Out.Write(key.CLS)
+	if _, e := l.ctrl.Out.Write(key.XY0); err == nil && e != nil {
+		err = e
+	}
+	if e := l.flush(); err == nil && e != nil {
+		err = e
+	}
+	return
 }
 
 // glyphCount returns the number of runes in l from k to k+n-1 that are not part
@@ -267,8 +276,8 @@ func (l *Line) ClearScreen() (err error) {
 //
 // See type Iterable (github.com/ardnew/embedit/seq/utf8) for more details.
 //
-// The value k = 0 always refers to l.head, i.e., the first rune of l; it does
-// not refer to index 0 of the backing array. It is the responsibility of this
+// The value k = 0 always refers to head, i.e., the first rune of l; it does not
+// refer to index 0 of the backing array. It is the responsibility of this
 // method to compute the appropriate offsets into the circular FIFO and account
 // for possible wraparound based on l's current head and tail. The caller must
 // not account for these offsets. Otherwise, incorrect indexing caused by double
@@ -304,6 +313,13 @@ func (l *Line) GlyphCountInPrompt() (count int) {
 // of l happens to be.
 func (l *Line) Position() int {
 	return int(l.posi.Get())
+}
+
+// Move appends sequences to the output buffer that move the cursor by the given
+// number of places from the current cursor position, updating l's logical
+// cursor position and the cursor's X, Y coordinates.
+func (l *Line) Move(places int) (err error) {
+	return l.MoveTo(l.Position() + places)
 }
 
 // MoveTo appends key sequences to the output buffer that move the cursor to the
@@ -389,8 +405,8 @@ func (l *Line) OverwriteAndMoveTo(s []rune, pos int) (err error) {
 	return
 }
 
-// flush moves all buffered bytes in l to the output buffer and advances the
-// cursor's current position to the end of the line.
+// flush copies all runes in l to the output buffer and advances the cursor's
+// current position to the end of the line.
 func (l *Line) flush() (err error) {
 	width := l.disp.Width()
 	h, t := l.head.Get(), l.tail.Get()

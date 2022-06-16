@@ -2,8 +2,8 @@ package terminal
 
 import (
 	"io"
-	"unicode/utf8"
 
+	"github.com/ardnew/embedit/config"
 	"github.com/ardnew/embedit/seq"
 	"github.com/ardnew/embedit/seq/eol"
 	"github.com/ardnew/embedit/seq/key"
@@ -185,33 +185,29 @@ func (t *Terminal) PressKey(k rune) (ok bool) {
 
 	case key.ClearScreen:
 		// Erase the screen and move the cursor to the home position.
-		t.queue([]rune("\x1b[2J\x1b[H"))
-		t.queue(t.prompt)
-		t.cursorX, t.cursorY = 0, 0
-		t.advanceCursor(visualLength(t.prompt))
-		t.setLine(t.line, pos)
+		l.ClearScreen()
 
 	default:
-		if t.AutoCompleteCallback != nil {
-			prefix := string(t.line[:pos])
-			suffix := string(t.line[pos:])
+		// if t.AutoCompleteCallback != nil {
+		// 	prefix := string(t.line[:pos])
+		// 	suffix := string(t.line[pos:])
 
-			t.lock.Unlock()
-			newLine, newPos, completeOk := t.AutoCompleteCallback(prefix+suffix, len(prefix), k)
-			t.lock.Lock()
+		// 	t.lock.Unlock()
+		// 	newLine, newPos, completeOk := t.AutoCompleteCallback(prefix+suffix, len(prefix), k)
+		// 	t.lock.Lock()
 
-			if completeOk {
-				t.setLine([]rune(newLine), utf8.RuneCount([]byte(newLine)[:newPos]))
-				return
-			}
-		}
-		if !isPrintable(k) {
+		// 	if completeOk {
+		// 		t.setLine([]rune(newLine), utf8.RuneCount([]byte(newLine)[:newPos]))
+		// 		return
+		// 	}
+		// }
+		if !key.IsPrintable(k) {
 			return
 		}
-		if len(t.line) == maxLineLength {
+		if l.RuneCount() == config.RunesPerLine {
 			return
 		}
-		t.addKeyToLine(k)
+		l.InsertRune(k)
 
 	}
 	return
