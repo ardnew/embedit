@@ -22,6 +22,11 @@ func (h *History) Configure(curs *cursor.Cursor) *History {
 	if h == nil {
 		return nil
 	}
+	if h.valid {
+		// Configure must be called one time only.
+		// Use object methods to modify configuration/state.
+		return h
+	}
 	h.valid = false
 	for i := range h.line {
 		_ = h.line[i].Configure(curs)
@@ -41,7 +46,7 @@ func (h *History) init() *History {
 
 // Len returns the number of Lines currently stored in History.
 func (h *History) Len() int {
-	if h == nil {
+	if h == nil || !h.valid {
 		return 0
 	}
 	return int(h.size.Get())
@@ -50,7 +55,7 @@ func (h *History) Len() int {
 // Add appends the pending Line to History.
 // If the History is filled to capacity, the oldest Line is discarded.
 func (h *History) Add() {
-	if h == nil {
+	if h == nil || !h.valid {
 		return
 	}
 	head := (h.head.Get() + 1) % config.LinesPerHistory
@@ -71,7 +76,7 @@ func (h *History) Add() {
 // that, and so on.
 // If n<0 or fewer than n+1 lines have been added, ok is false.
 func (h *History) Get(n int) (ln *line.Line, ok bool) {
-	if h == nil || n < 0 || n >= int(h.size.Get()) {
+	if h == nil || !h.valid || n < 0 || n >= int(h.size.Get()) {
 		return nil, false
 	}
 	index := int(h.head.Get()) - n

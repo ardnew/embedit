@@ -20,6 +20,11 @@ func (d *Display) Configure(width, height int, prompt []rune, echo bool) *Displa
 	if d == nil {
 		return nil
 	}
+	if d.valid {
+		// Configure must be called one time only.
+		// Use object methods to modify configuration/state.
+		return d
+	}
 	d.valid = false
 	d.SetSize(width, height)
 	d.SetPrompt(prompt)
@@ -35,7 +40,7 @@ func (d *Display) init() *Display {
 
 // Width returns the Display width.
 func (d *Display) Width() int {
-	if d == nil {
+	if d == nil || !d.valid {
 		return 0
 	}
 	return int(d.width.Get())
@@ -43,7 +48,7 @@ func (d *Display) Width() int {
 
 // Height returns the Display height.
 func (d *Display) Height() int {
-	if d == nil {
+	if d == nil || !d.valid {
 		return 0
 	}
 	return int(d.height.Get())
@@ -51,7 +56,7 @@ func (d *Display) Height() int {
 
 // Size returns the Display width and height.
 func (d *Display) Size() (width, height int) {
-	if d == nil {
+	if d == nil || !d.valid {
 		return 0, 0
 	}
 	return int(d.width.Get()), int(d.height.Get())
@@ -89,7 +94,7 @@ func (d *Display) SetEcho(echo bool) {
 
 // Prompt returns the user input prompt.
 func (d *Display) Prompt() []rune {
-	if d == nil || d.prompt == nil {
+	if d == nil || !d.valid || d.prompt == nil {
 		return config.DefaultPrompt
 	}
 	return d.prompt
@@ -97,7 +102,7 @@ func (d *Display) Prompt() []rune {
 
 // PromptIterator returns the user input prompt as utf8.RuneIterator.
 func (d *Display) PromptIterator() utf8.Iterator {
-	if d == nil || d.prompt == nil {
+	if d == nil || !d.valid || d.prompt == nil {
 		return (*utf8.IterableRune)(&config.DefaultPrompt)
 	}
 	return (*utf8.IterableRune)(&d.prompt)

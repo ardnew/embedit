@@ -29,11 +29,16 @@ type Config struct {
 	Height int
 }
 
+// New allocates a new Embedit and returns a pointer to that object.
+//
+// The object remains uninitialized and unusable until Configure has been called
+func New() Embedit { return Embedit{} }
+
 // Configure initializes the Embedit configuration.
 func (e *Embedit) Configure(config Config) *Embedit {
 	e.valid = false
 	_ = e.term.Configure(config.RW, config.Prompt, config.Width, config.Height)
-	return e
+	return e.init()
 }
 
 // init initializes the state of a configured Embedit.
@@ -44,14 +49,14 @@ func (e *Embedit) init() *Embedit {
 
 // Terminal returns the terminal.
 func (e *Embedit) Terminal() *terminal.Terminal {
-	if e == nil {
+	if e == nil || !e.valid {
 		return nil
 	}
 	return &e.term
 }
 
 func (e *Embedit) Cursor() *cursor.Cursor {
-	if e == nil {
+	if e == nil || !e.valid {
 		return nil
 	}
 	return e.term.Cursor()
@@ -59,7 +64,7 @@ func (e *Embedit) Cursor() *cursor.Cursor {
 
 // Line returns the Terminal's active user input line.
 func (e *Embedit) Line() *line.Line {
-	if e == nil {
+	if e == nil || !e.valid {
 		return nil
 	}
 	return e.term.Line()

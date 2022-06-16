@@ -42,7 +42,9 @@ func (t *Terminal) Configure(
 	t.rw = rw
 	t.history.Configure(
 		t.cursor.Configure(
-			t.control.Configure(t, t.in.Configure(eol.LF), t.out.Configure(eol.CRLF)),
+			t.control.Configure(t,
+				t.in.Configure(eol.LF),
+				t.out.Configure(eol.CRLF)),
 			t.display.Configure(width, height, prompt, true),
 		))
 	return t.init()
@@ -52,7 +54,8 @@ func (t *Terminal) Configure(
 func (t *Terminal) init() *Terminal {
 	t.valid = true
 	t.paste = paste.Inactive
-	t.Line().Overwrite(nil)
+	t.Line().ShowPrompt()
+	t.Line().Set(nil)
 	return t
 }
 
@@ -76,6 +79,87 @@ func (t *Terminal) Line() *line.Line {
 	return t.history.Line()
 }
 
+// func (t *Terminal) readLine() (err error) {
+// 	l := t.Line()
+
+// 	if t.cursorX == 0 && t.cursorY == 0 {
+// 		t.writeLine(t.prompt)
+// 		t.c.Write(t.outBuf)
+// 		t.outBuf = t.outBuf[:0]
+// 	}
+
+// 	lineIsPasted := t.pasteActive
+
+// 	for {
+// 		rest := t.remainder
+// 		lineOk := false
+// 		for !lineOk {
+// 			var key rune
+// 			key, rest = bytesToKey(rest, t.pasteActive)
+// 			if key == utf8.RuneError {
+// 				break
+// 			}
+// 			if !t.pasteActive {
+// 				if key == keyCtrlD {
+// 					if len(t.line) == 0 {
+// 						return "", io.EOF
+// 					}
+// 				}
+// 				if key == keyCtrlC {
+// 					return "", io.EOF
+// 				}
+// 				if key == keyPasteStart {
+// 					t.pasteActive = true
+// 					if len(t.line) == 0 {
+// 						lineIsPasted = true
+// 					}
+// 					continue
+// 				}
+// 			} else if key == keyPasteEnd {
+// 				t.pasteActive = false
+// 				continue
+// 			}
+// 			if !t.pasteActive {
+// 				lineIsPasted = false
+// 			}
+// 			line, lineOk = t.handleKey(key)
+// 		}
+// 		if len(rest) > 0 {
+// 			n := copy(t.inBuf[:], rest)
+// 			t.remainder = t.inBuf[:n]
+// 		} else {
+// 			t.remainder = nil
+// 		}
+// 		t.c.Write(t.outBuf)
+// 		t.outBuf = t.outBuf[:0]
+// 		if lineOk {
+// 			if t.echo {
+// 				t.historyIndex = -1
+// 				t.history.Add(line)
+// 			}
+// 			if lineIsPasted {
+// 				err = ErrPasteIndicator
+// 			}
+// 			return
+// 		}
+
+// 		// t.remainder is a slice at the beginning of t.inBuf
+// 		// containing a partial key sequence
+// 		readBuf := t.inBuf[len(t.remainder):]
+// 		var n int
+
+// 		t.lock.Unlock()
+// 		n, err = t.c.Read(readBuf)
+// 		t.lock.Lock()
+
+// 		if err != nil {
+// 			return
+// 		}
+
+// 		t.remainder = t.inBuf[:n+len(t.remainder)]
+// 	}
+// }
+
 // PressKey processes a given keypress on the current line.
 func (t *Terminal) PressKey(k rune) (ok bool) {
 	l := t.Line()
@@ -92,39 +176,39 @@ func (t *Terminal) PressKey(k rune) (ok bool) {
 		if pos == 0 {
 			return
 		}
-		ok = l.ErasePrevRune(1) == nil
+		ok = l.ErasePreviousRuneCount(1) == nil
 
 	case key.AltLeft:
 		// Move left by 1 word.
-		ok = l.MoveTo(pos-l.RuneCountToPrevWord()) == nil
+		ok = l.MoveCursor(-l.RuneCountToStartOfWord()) == nil
 
 	case key.AltRight:
 		// Move right by 1 word.
-		ok = l.MoveTo(pos+l.RuneCountToNextWord()) == nil
+		ok = l.MoveCursor(+l.RuneCountToStartOfNextWord()) == nil
 
 	case key.Left:
 		if pos == 0 {
 			return
 		}
-		ok = l.MoveTo(pos-1) == nil
+		ok = l.MoveCursor(-1) == nil
 
 	case key.Right:
 		if pos == siz {
 			return
 		}
-		ok = l.MoveTo(pos+1) == nil
+		ok = l.MoveCursor(+1) == nil
 
 	case key.Home:
 		if pos == 0 {
 			return
 		}
-		ok = l.MoveTo(0) == nil
+		ok = l.MoveCursorTo(0) == nil
 
 	case key.End:
 		if pos == siz {
 			return
 		}
-		ok = l.MoveTo(siz) == nil
+		ok = l.MoveCursorTo(siz) == nil
 
 		/*
 			case key.Up:
@@ -157,35 +241,37 @@ func (t *Terminal) PressKey(k rune) (ok bool) {
 		*/
 
 	case key.Enter:
-		l.MoveTo(siz)
+		l.MoveCursorTo(siz)
 		t.out.WriteEOL()
 		l.LineFeed()
+		l.ShowPrompt()
 
 	case key.DeleteWord:
+		// Move to the end of the current word iff cursor is not on white space.
+		l.MoveCursor(+l.RuneCountToEndOfWord())
 		// Delete zero or more spaces and then one or more characters.
-		l.ErasePrevRune(l.RuneCountToPrevWord())
+		l.ErasePreviousRuneCount(l.RuneCountToStartOfWord())
 
 	case key.DeleteLine:
-		// Delete everything from the current cursor position to the
-		// end of line.
-		l.MoveTo(siz)
-		l.ErasePrevRune(siz - pos)
+		// Delete everything from the current cursor position to the end of line.
+		l.MoveCursorTo(siz)
+		l.ErasePreviousRuneCount(siz - pos)
 
 	case key.CtrlD:
-		// Erase the character under the current position.
-		// The EOF case when the line is empty is handled in
-		// readLine().
+		// Erase the character under the current position. The EOF case when the
+		// line is empty is handled in readLine().
 		if pos < siz {
-			l.MoveTo(pos + 1)
-			l.ErasePrevRune(1)
+			l.MoveCursor(+1)
+			l.ErasePreviousRuneCount(1)
 		}
 
 	case key.CtrlU:
-		l.ErasePrevRune(pos)
+		l.ErasePreviousRuneCount(pos)
 
 	case key.ClearScreen:
 		// Erase the screen and move the cursor to the home position.
 		l.ClearScreen()
+		l.ShowPrompt()
 
 	default:
 		// if t.AutoCompleteCallback != nil {

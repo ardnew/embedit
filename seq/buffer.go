@@ -28,7 +28,13 @@ func (buf *Buffer) Configure(mode eol.Mode) *Buffer {
 	if buf == nil {
 		return nil
 	}
+	if buf.valid {
+		// Configure must be called one time only.
+		// Use object methods to modify configuration/state.
+		return buf
+	}
 	buf.valid = false
+	buf.mode = mode
 	return buf.init()
 }
 
@@ -40,7 +46,7 @@ func (buf *Buffer) init() *Buffer {
 
 // Len returns the number of bytes in buf.
 func (buf *Buffer) Len() int {
-	if buf == nil {
+	if buf == nil || !buf.valid {
 		return 0
 	}
 	return int(buf.tail.Get() - buf.head.Get())
@@ -54,7 +60,7 @@ func (buf *Buffer) reset() *Buffer {
 
 // Reset sets the Buffer length to 0.
 func (buf *Buffer) Reset() {
-	if buf == nil {
+	if buf == nil || !buf.valid {
 		return
 	}
 	_ = buf.reset()
@@ -63,7 +69,7 @@ func (buf *Buffer) Reset() {
 // Read copies up to len(p) unread bytes from buf to p and returns the number of
 // bytes copied.
 func (buf *Buffer) Read(p []byte) (n int, err error) {
-	if buf == nil {
+	if buf == nil || !buf.valid {
 		return 0, &errors.ErrInvalidReceiver
 	}
 	if p == nil {
@@ -93,7 +99,7 @@ func (buf *Buffer) Read(p []byte) (n int, err error) {
 // Write will only write to the free space in buf and then return
 // ErrWriteOverflow if all of p could not be copied.
 func (buf *Buffer) Write(p []byte) (n int, err error) {
-	if buf == nil {
+	if buf == nil || !buf.valid {
 		return 0, &errors.ErrInvalidReceiver
 	}
 	if p == nil {
@@ -157,7 +163,7 @@ func (buf *Buffer) readFrom(r io.Reader, lo, hi int) (n int, err error) {
 // Bytes are copied directly without any buffering, so r and buf must not
 // overlap if both are implemented as buffers of physical memory.
 func (buf *Buffer) ReadFrom(r io.Reader) (n int64, err error) {
-	if buf == nil {
+	if buf == nil || !buf.valid {
 		return 0, &errors.ErrInvalidReceiver
 	}
 	if r == nil {
@@ -299,7 +305,7 @@ func (buf *Buffer) writeTo(w io.Writer, lo, hi int) (n int, err error) {
 // Bytes are copied directly without any buffering, so w and buf must not
 // overlap if both are implemented as buffers of physical memory.
 func (buf *Buffer) WriteTo(w io.Writer) (n int64, err error) {
-	if buf == nil {
+	if buf == nil || !buf.valid {
 		return 0, &errors.ErrInvalidReceiver
 	}
 	if w == nil {
@@ -356,7 +362,7 @@ func (buf *Buffer) WriteTo(w io.Writer) (n int64, err error) {
 // either a valid byte and nil error, or an invalid byte and non-nil error.
 // In particular, ReadByte never returns a byte read along with error == io.EOF.
 func (buf *Buffer) ReadByte() (b byte, err error) {
-	if buf == nil {
+	if buf == nil || !buf.valid {
 		return 0, &errors.ErrInvalidReceiver
 	}
 	h, t := buf.head.Get(), buf.tail.Get()
@@ -376,7 +382,7 @@ func (buf *Buffer) ReadByte() (b byte, err error) {
 // WriteByte appends b to buf and returns nil.
 // If buf is full, returns ErrWriteOverflow.
 func (buf *Buffer) WriteByte(b byte) (err error) {
-	if buf == nil {
+	if buf == nil || !buf.valid {
 		return &errors.ErrInvalidReceiver
 	}
 	h, t := buf.head.Get(), buf.tail.Get()
