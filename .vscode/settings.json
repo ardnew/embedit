@@ -23,7 +23,7 @@
     "showRegisters": true,
     "debugAdapter": "dlv-dap",
     "dlvFlags": [
-      "--disable-aslr"
+      "--disable-aslr",
     ]
   },
   "go.disableConcurrentTests": true,
@@ -48,7 +48,7 @@
   // ---------------------------------------------------------------------------
   "gopls": {
     "build.buildFlags": [
-
+      "-tags=history",
     ],
     "formatting.gofumpt": true,
     "ui.diagnostic.analyses": {

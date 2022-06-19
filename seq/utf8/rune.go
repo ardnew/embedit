@@ -6,7 +6,8 @@ import (
 	"github.com/ardnew/embedit/errors"
 )
 
-// Rune extends type rune with unbuffered implementations of io.Copy interfaces.
+// Rune extends type rune with unbuffered implementations of several interfaces
+// from standard library package "io".
 type Rune rune
 
 // invalid defines an invalid Rune.

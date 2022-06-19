@@ -5,7 +5,7 @@ import (
 	"io"
 	"unicode/utf8"
 
-	"github.com/ardnew/embedit/config"
+	"github.com/ardnew/embedit/config/limits"
 	"github.com/ardnew/embedit/errors"
 	"github.com/ardnew/embedit/seq/eol"
 	"github.com/ardnew/embedit/seq/key"
@@ -15,8 +15,8 @@ import (
 
 // Buffer defines an I/O buffer for Terminal control/data byte sequences.
 type Buffer struct {
-	Byte  [config.BytesPerBuffer]byte
-	skey  [config.MaxBytesPerKey]byte
+	Byte  [limits.BytesPerBuffer]byte
+	skey  [limits.MaxBytesPerKey]byte
 	head  volatile.Register32
 	tail  volatile.Register32
 	mode  eol.Mode
@@ -52,6 +52,14 @@ func (buf *Buffer) Len() int {
 	return int(buf.tail.Get() - buf.head.Get())
 }
 
+// Cap returns the byte capacity of buf.
+func (buf *Buffer) Cap() int {
+	if buf == nil || !buf.valid {
+		return 0
+	}
+	return limits.BytesPerBuffer
+}
+
 func (buf *Buffer) reset() *Buffer {
 	buf.head.Set(0)
 	buf.tail.Set(0)
@@ -82,7 +90,7 @@ func (buf *Buffer) Read(p []byte) (n int, err error) {
 	}
 	h := buf.head.Get()
 	for i := range p[:n] {
-		p[i] = buf.Byte[h%config.BytesPerBuffer]
+		p[i] = buf.Byte[h%limits.BytesPerBuffer]
 		h++
 	}
 	if err == io.EOF {
@@ -117,10 +125,10 @@ func (buf *Buffer) Write(p []byte) (n int, err error) {
 	} else {
 		h, t := buf.head.Get(), buf.tail.Get()
 		for _, b := range p {
-			if t-h >= config.BytesPerBuffer {
+			if t-h >= limits.BytesPerBuffer {
 				break
 			}
-			buf.Byte[t%config.BytesPerBuffer] = b
+			buf.Byte[t%limits.BytesPerBuffer] = b
 			t++
 			n++
 		}
@@ -139,7 +147,7 @@ func (buf *Buffer) readFrom(r io.Reader, lo, hi int) (n int, err error) {
 	// We can do a brief sanity check on the indices to prevent A/V errors, but no
 	// attempt is made to normalize, split the range into slices, or verify the
 	// range starts at tail and spans only the free-space region.
-	if lo >= hi || lo < 0 || hi > config.BytesPerBuffer {
+	if lo >= hi || lo < 0 || hi > limits.BytesPerBuffer {
 		// The above condition implies 0<=lo < hi<=N:
 		//   If lo<hi and lo>=0, then hi>0 (i.e.: 0<=lo<hi => hi>0).
 		//   If lo<hi and hi<=N, then lo<N (i.e.: lo<hi<=N => lo<N).
@@ -173,12 +181,12 @@ func (buf *Buffer) ReadFrom(r io.Reader) (n int64, err error) {
 	if h == t {
 		// Buffer is empty, ensure our indices are reset before writing across the
 		// entire backing array.
-		n0, err0 := buf.reset().readFrom(r, 0, config.BytesPerBuffer)
+		n0, err0 := buf.reset().readFrom(r, 0, limits.BytesPerBuffer)
 		return int64(n0), err0
 	}
 	// Convert head and tail to physical array indices to determine if the used
 	// elements span a contiguous region of memory in the backing array.
-	ih, it := h%config.BytesPerBuffer, t%config.BytesPerBuffer
+	ih, it := h%limits.BytesPerBuffer, t%limits.BytesPerBuffer
 	// If the array indices are equal, with head not eqaul to tail (see above),
 	// then the backing array is filled to capacity. We have nowhere to store the
 	// bytes from r. We can either overwrite the existing Buffer or retain it and
@@ -193,7 +201,7 @@ func (buf *Buffer) ReadFrom(r io.Reader) (n int64, err error) {
 	//   (0123456789A) === Array index reference
 	//   [HxxxT......]     Free-space forms contiguous span [4..A]
 	if ih == 0 {
-		nr, errr := buf.readFrom(r, int(it), config.BytesPerBuffer)
+		nr, errr := buf.readFrom(r, int(it), limits.BytesPerBuffer)
 		return int64(nr), errr
 	}
 	// Tail grows as elements are added to the ring buffer. Thus, if tail is less
@@ -215,7 +223,7 @@ func (buf *Buffer) ReadFrom(r io.Reader) (n int64, err error) {
 			err1, err2 error
 		)
 		// (1.) Copy into tail to end of the backing array
-		if n1, err1 = buf.readFrom(r, int(it), config.BytesPerBuffer); err1 != nil {
+		if n1, err1 = buf.readFrom(r, int(it), limits.BytesPerBuffer); err1 != nil {
 			return int64(n1), err1
 		}
 		// (2.) Copy into start of the backing array to head (if region length > 0).
@@ -241,7 +249,7 @@ func (buf *Buffer) writeTo(w io.Writer, lo, hi int) (n int, err error) {
 	//
 	// We can do a brief sanity check on the indices to prevent A/V errors,
 	// but no attempt is made to normalize or split the range into slices.
-	if lo >= hi || lo < 0 || hi > config.BytesPerBuffer {
+	if lo >= hi || lo < 0 || hi > limits.BytesPerBuffer {
 		// The above condition implies 0<=lo < hi<=N:
 		//   If lo<hi and lo>=0, then hi>0 (i.e.: 0<=lo<hi => hi>0).
 		//   If lo<hi and hi<=N, then lo<N (i.e.: lo<hi<=N => lo<N).
@@ -318,7 +326,7 @@ func (buf *Buffer) WriteTo(w io.Writer) (n int64, err error) {
 	}
 	// Convert head and tail to physical array indices to determine if the used
 	// elements span a contiguous region of memory in the backing array.
-	ih, it := h%config.BytesPerBuffer, t%config.BytesPerBuffer
+	ih, it := h%limits.BytesPerBuffer, t%limits.BytesPerBuffer
 	// Tail grows as elements are added to the ring buffer. Thus, if tail is less
 	// than head, then the tail index has wrapped around after growing beyond the
 	// backing array's high index (capacity-1), but the head index has not yet
@@ -336,10 +344,10 @@ func (buf *Buffer) WriteTo(w io.Writer) (n int64, err error) {
 		//   [Hxxxxxxxxxx]     Elements in region 1 [0..A] only
 		// So we will potentially need to copy the elements in two phases:
 		// (1.) Copy from head to the end of the backing array.
-		n1, err1 := buf.writeTo(w, int(ih), config.BytesPerBuffer)
+		n1, err1 := buf.writeTo(w, int(ih), limits.BytesPerBuffer)
 		// If the number of bytes written equals the backing array's capacity, then
 		// buf was filled to capacity and is now empty; nothing to copy in phase 2.
-		if err1 != nil || n1 == config.BytesPerBuffer {
+		if err1 != nil || n1 == limits.BytesPerBuffer {
 			return int64(n1), err1
 		}
 		// (2.) Copy from start of the backing array to tail.
@@ -376,7 +384,7 @@ func (buf *Buffer) ReadByte() (b byte, err error) {
 		buf.head.Set(h + 1)
 	}
 	// Return the byte from original head position.
-	return buf.Byte[h%config.BytesPerBuffer], nil
+	return buf.Byte[h%limits.BytesPerBuffer], nil
 }
 
 // WriteByte appends b to buf and returns nil.
@@ -393,13 +401,13 @@ func (buf *Buffer) WriteByte(b byte) (err error) {
 		buf.tail.Set(1)
 		return nil
 	}
-	it := t % config.BytesPerBuffer
+	it := t % limits.BytesPerBuffer
 	// If the array indices are equal, with head not eqaul to tail (see above),
 	// then the backing array is filled to capacity. We have nowhere to store the
 	// byte. We can either discard head or retain it and return an error. Opting
 	// for the latter so that no byte is lost, and it gives the caller an
 	// opportunity to remedy the situation.
-	if it == h%config.BytesPerBuffer {
+	if it == h%limits.BytesPerBuffer {
 		return &errors.ErrWriteOverflow
 	}
 	// Write the byte into tail position and increment length by 1.
@@ -417,31 +425,39 @@ func (buf *Buffer) WriteEOL() (n int, err error) {
 // Parse tries to parse a key sequence from buf.
 // If successful, it returns the key r and its size n in bytes.
 // Otherwise, it returns key.Error and n=0.
-func (buf *Buffer) Parse(offset int, isPasting bool) (r rune, n int) {
+//
+// Parse consumes the bytes that contribute to the returned key r.
+// If an entire sequence could not be parsed, no bytes are consumed.
+func (buf *Buffer) Parse(isPasting bool) (r rune, n int) {
 	h, t := buf.head.Get(), buf.tail.Get()
 	size := t - h // Number of bytes currently in buf.
-	if size == 0 || uint32(offset) >= size {
+	if size == 0 {
 		return key.Error, 0
 	}
 	// Size is the minimum among:
-	//   a.) the number bytes in buf.Byte (adjusted for offset); or
+	//   a.) the number bytes in buf.Byte; or
 	//   b.) the maximum length of a key sequence (cap(buf.skey)).
-	size -= uint32(offset)
-	if size > config.MaxBytesPerKey {
-		size = config.MaxBytesPerKey
+	if size > limits.MaxBytesPerKey {
+		size = limits.MaxBytesPerKey
 	}
-	// Copy our source bytes (adjusted for offset) to the temporary buffer []skey
-	// so that we can decode it via unicode/utf8 package without problems due to
-	// alignment/overflow arising because our backing array is a circular FIFO.
-	h += uint32(offset)
+	// Copy our source bytes to the temporary buffer []skey so that we can decode
+	// it via package "unicode/utf8" without alignment/overflow problems due to
+	// our backing array being a circular FIFO.
 	for i := uint32(0); i < size; i++ {
-		buf.skey[i] = buf.Byte[(h+i)%config.BytesPerBuffer]
+		buf.skey[i] = buf.Byte[(h+i)%limits.BytesPerBuffer]
 	}
-	for i := size; i < config.MaxBytesPerKey; i++ {
+	for i := size; i < limits.MaxBytesPerKey; i++ {
 		buf.skey[i] = 0 // Zero out remaining bytes in []skey.
 	}
-	// Now we can begin parsing from []skey.
+	// Be sure to consume the bytes parsed into r.
+	defer func(b *Buffer, head uint32) {
+		if n > 0 {
+			b.head.Set(head + uint32(n))
+		}
+	}(buf, h)
+
 	if !isPasting {
+		// UTF-8 control codes (ASCII)
 		switch buf.skey[0] {
 		case key.CtrlA:
 			return key.Home, 1
@@ -453,8 +469,8 @@ func (buf *Buffer) Parse(offset int, isPasting bool) (r rune, n int) {
 			return key.Right, 1
 		case key.CtrlH:
 			return key.Backspace, 1
-		case key.CtrlK: // <-- TBD
-			return key.DeleteLine, 1
+		case key.CtrlK:
+			return key.DeleteTrailing, 1
 		case key.CtrlL:
 			return key.ClearScreen, 1
 		case key.CtrlN:
@@ -462,24 +478,29 @@ func (buf *Buffer) Parse(offset int, isPasting bool) (r rune, n int) {
 		case key.CtrlP:
 			return key.Up, 1
 		case key.CtrlU:
-			return key.DeleteLine, 1
+			return key.DeleteLeading, 1
 		case key.CtrlW:
 			return key.DeleteWord, 1
 		}
 	}
+	// UTF-8 runes
 	if buf.skey[0] != key.Escape {
 		if !utf8.FullRune(buf.skey[0:]) {
 			return key.Error, 0
 		}
 		return utf8.DecodeRune(buf.skey[0:])
 	}
+	// ANSI escape sequences
 	if bytes.HasPrefix(buf.skey[0:], key.CSI) {
 		if isPasting {
 			if bytes.HasPrefix(buf.skey[0:], key.EOP) {
 				return key.PasteEnd, len(key.EOP)
 			}
 		} else {
-			if size >= 3 {
+			switch size {
+
+			case 3:
+				// xterm sequences
 				switch buf.skey[2] {
 				case 'A':
 					return key.Up, 3
@@ -494,8 +515,88 @@ func (buf *Buffer) Parse(offset int, isPasting bool) (r rune, n int) {
 				case 'F':
 					return key.End, 3
 				}
-				if size >= 6 &&
-					buf.skey[2] == '1' && buf.skey[3] == ';' && buf.skey[4] == '3' {
+			case 4:
+				// vt sequences
+				if buf.skey[3] == '~' {
+					switch buf.skey[2] {
+					case '1':
+						return key.Home, 4
+					case '2':
+						return key.Insert, 4
+					case '3':
+						return key.Delete, 4
+					case '4':
+						return key.End, 4
+					case '5':
+						return key.PageUp, 4
+					case '6':
+						return key.PageDown, 4
+					case '7':
+						return key.Home, 4
+					case '8':
+						return key.End, 4
+					}
+				}
+			case 5:
+				// vt sequences
+				if buf.skey[4] == '~' {
+					switch buf.skey[2] {
+					case '1':
+						switch buf.skey[3] {
+						case '0':
+							return key.F0, 5
+						case '1':
+							return key.F1, 5
+						case '2':
+							return key.F2, 5
+						case '3':
+							return key.F3, 5
+						case '4':
+							return key.F4, 5
+						case '5':
+							return key.F5, 5
+						case '7':
+							return key.F6, 5
+						case '8':
+							return key.F7, 5
+						case '9':
+							return key.F8, 5
+						}
+					case '2':
+						switch buf.skey[3] {
+						case '0':
+							return key.F9, 5
+						case '1':
+							return key.F10, 5
+						case '3':
+							return key.F11, 5
+						case '4':
+							return key.F12, 5
+						case '5':
+							return key.F13, 5
+						case '6':
+							return key.F14, 5
+						case '8':
+							return key.F15, 5
+						case '9':
+							return key.F16, 5
+						}
+					case '3':
+						switch buf.skey[3] {
+						case '1':
+							return key.F17, 5
+						case '2':
+							return key.F18, 5
+						case '3':
+							return key.F19, 5
+						case '4':
+							return key.F20, 5
+						}
+					}
+				}
+			case 6:
+				// xterm sequences
+				if buf.skey[2] == '1' && buf.skey[3] == ';' && buf.skey[4] == '3' {
 					switch buf.skey[5] {
 					case 'C':
 						return key.AltRight, 6
@@ -509,6 +610,7 @@ func (buf *Buffer) Parse(offset int, isPasting bool) (r rune, n int) {
 			}
 		}
 	}
+
 	// If we get here then we have a key that we don't recognise, or a partial
 	// sequence.
 	// It's not clear how one should find the end of a sequence without knowing
@@ -518,6 +620,5 @@ func (buf *Buffer) Parse(offset int, isPasting bool) (r rune, n int) {
 			return key.Unknown, i + 1
 		}
 	}
-
 	return key.Error, 0
 }

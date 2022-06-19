@@ -8,6 +8,7 @@
       "detail": "Build with debug disabled, profile disabled, and trace disabled",
       "args": [
           "build",
+          "-tags=history",
           "-o=.vscode/build/examples/stdio/build.bin",
           "./examples/stdio"
       ],
@@ -26,6 +27,7 @@
       "detail": "Build with debug enabled, profile disabled, and trace disabled",
       "args": [
           "build",
+          "-tags=history",
           "-gcflags=all=-N -l",
           "-o=.vscode/build/examples/stdio/debug.bin",
           "./examples/stdio",
@@ -45,7 +47,7 @@
       "detail": "Build with debug enabled, profile enabled, and trace disabled",
       "args": [
           "build",
-          "-tags=pprof",
+          "-tags=history,pprof",
           "-gcflags=all=-N -l -m",
           "-o=.vscode/build/examples/stdio/profile.bin",
           "./examples/stdio",
@@ -65,7 +67,7 @@
       "detail": "Build with debug enabled, profile disabled, and trace enabled",
       "args": [
           "build",
-          "-tags=trace",
+          "-tags=history,trace",
           "-gcflags=all=-N -l -m",
           "-o=.vscode/build/examples/stdio/trace.bin",
           "./examples/stdio",

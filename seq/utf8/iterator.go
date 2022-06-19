@@ -17,36 +17,57 @@ type Iterator interface {
 
 // IterableRune implements Iterator using the native Go type []rune.
 //
-// Use a construct like the following to convert an existing []rune to Iterable:
+// Use a construct like the following to convert an existing []rune to Iterable
+// without causing a copy/alloc:
 //
 //	  var aSlice = []rune{...} // Some global
 //	  ...
 //		   it := Iterable{Iterator: (*IterableRune)(&aSlice)}
 type IterableRune []rune
 
-// IterableRune methods implementing Iterator for native go type []rune.
-func (ir *IterableRune) RuneHead() uint32   { return 0 }
-func (ir *IterableRune) RuneTail() uint32   { return uint32(len(*ir)) }
+// RuneHead returns 0.
+// Implements Iterator for native Go type []rune.
+func (ir *IterableRune) RuneHead() uint32 { return 0 }
+
+// RuneTail returns len(*ir).
+// Implements Iterator for native Go type []rune.
+func (ir *IterableRune) RuneTail() uint32 { return uint32(len(*ir)) }
+
+// RuneAt returns a pointer to (*ir)[i].
+// Implements Iterator for native Go type []rune.
 func (ir *IterableRune) RuneAt(i int) *Rune { return (*Rune)(&(*ir)[i]) }
 
+// Iterable defines a concrete implementation of an Iterator that provides
+// type-agnostic methods over the interface.
 type Iterable struct {
 	Iterator
 	pos uint32 // Current element index (1st slice index, e.g., slice[pos:...])
 	end uint32 // Last element index +1 (2nd slice index, e.g., slice[...:end])
 }
 
-func (s *Iterable) Reset() (ok bool) {
+// Reset resets the internal indices of s based on the backing Iterator's
+// current head and tail indices.
+func (s *Iterable) Reset() *Iterable {
 	if s == nil || s.Iterator == nil {
-		return false
+		return nil
 	}
 	s.pos = s.RuneHead()
 	s.end = s.RuneTail()
-	return true
+	return s
 }
 
-func (s *Iterable) Slice(lo, hi int) (ok bool) {
-	if !s.Reset() || s.pos == s.end {
-		return false // Invalid or empty receiver
+// Slice sets the internal indices of s based on the backing Iterator's current
+// head and tail indices offset by the given lo and hi slice indices.
+//
+// Both lo and hi are relative to head and tail of s, such that lo=0 always
+// refers to s's head index (even if s was previously sliced).
+//
+// If lo and/or hi are negative, they are treated as unspecified slice indices.
+// For example, Slice(-1, N) is equivalent to s[:N], Slice(N, -1) is to s[N:],
+// and Slice(-1, -1) is to s[:] (also equivalent to Reset).
+func (s *Iterable) Slice(lo, hi int) *Iterable {
+	if s.Reset() == nil || s.pos == s.end {
+		return nil // Invalid or empty receiver
 	}
 	if lo < 0 { // From 0 to hi-1
 		lo = 0
@@ -58,13 +79,18 @@ func (s *Iterable) Slice(lo, hi int) (ok bool) {
 		// The above condition implies 0<=lo < hi<=N:
 		//   If lo<hi and lo>=0, then hi>0 (i.e.: 0<=lo<hi => hi>0).
 		//   If lo<hi and hi<=N, then lo<N (i.e.: lo<hi<=N => lo<N).
-		return false
+		// Don't modify s, just return nil to indicate an invalid slice.
+		return nil
 	}
 	s.end = s.pos + uint32(hi)
 	s.pos = s.pos + uint32(lo)
-	return true
+	return s
 }
 
+// Next returns the next Rune in s.
+//
+// If there are no elements remaining in s, returns a Rune r such that
+// r.IsError() == true and r.Len() == 0.
 func (s *Iterable) Next() (r *Rune) {
 	if s == nil || s.Iterator == nil || s.pos == s.end {
 		return &invalid
@@ -78,8 +104,8 @@ func (s *Iterable) Next() (r *Rune) {
 // each valid rune. Rune encodings that are invalid UTF-8 are considered to have
 // zero bytes. Unlike GlyphCount, runes in escape sequences are included.
 //
-// Once scanning completes, the receiver Iterable's head and tail are restored
-// to their original value when the method was entered.
+// Once scanning completes, the receiver's internal indices are reset to their
+// original value from when the method was called.
 func (s *Iterable) Len() (n int) {
 	if s == nil || s.Iterator == nil {
 		return
@@ -98,8 +124,8 @@ func (s *Iterable) Len() (n int) {
 // GlyphCount scans the current range and counts the number of runes that
 // are not within any escape sequence.
 //
-// Once scanning completes, the receiver Iterable's head and tail are restored
-// to their original value when the method was entered.
+// Once scanning completes, the receiver's internal indices are reset to their
+// original value from when the method was called.
 //
 // Note that only those runes that are in escape sequences which begin at or
 // after the Iterator's first element (at RuneHead) will be excluded from the

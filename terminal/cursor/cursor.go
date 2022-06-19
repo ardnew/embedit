@@ -171,6 +171,5 @@ func (c *Cursor) Move(up, down, left, right int) (err error) {
 		c.ascii.WriteTo(c.ctrl.Out)
 		c.ctrl.Out.WriteByte('C')
 	}
-	_, err = c.ctrl.Flush()
 	return
 }

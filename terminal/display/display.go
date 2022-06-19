@@ -1,7 +1,7 @@
 package display
 
 import (
-	"github.com/ardnew/embedit/config"
+	"github.com/ardnew/embedit/config/defaults"
 	"github.com/ardnew/embedit/seq/utf8"
 	"github.com/ardnew/embedit/volatile"
 )
@@ -66,10 +66,10 @@ func (d *Display) Size() (width, height int) {
 func (d *Display) SetSize(width, height int) {
 	if d != nil {
 		if width <= 0 {
-			width = config.DefaultWidth
+			width = defaults.Width
 		}
 		if height <= 0 {
-			height = config.DefaultHeight
+			height = defaults.Height
 		}
 		d.width.Set(uint32(width))
 		d.height.Set(uint32(height))
@@ -95,7 +95,7 @@ func (d *Display) SetEcho(echo bool) {
 // Prompt returns the user input prompt.
 func (d *Display) Prompt() []rune {
 	if d == nil || !d.valid || d.prompt == nil {
-		return config.DefaultPrompt
+		return defaults.Prompt
 	}
 	return d.prompt
 }
@@ -103,7 +103,7 @@ func (d *Display) Prompt() []rune {
 // PromptIterator returns the user input prompt as utf8.RuneIterator.
 func (d *Display) PromptIterator() utf8.Iterator {
 	if d == nil || !d.valid || d.prompt == nil {
-		return (*utf8.IterableRune)(&config.DefaultPrompt)
+		return (*utf8.IterableRune)(&defaults.Prompt)
 	}
 	return (*utf8.IterableRune)(&d.prompt)
 }

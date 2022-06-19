@@ -8,12 +8,12 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/ardnew/embedit/config"
+	"github.com/ardnew/embedit/config/limits"
 	"github.com/ardnew/embedit/seq/eol"
 	"github.com/ardnew/embedit/volatile"
 )
 
-var seqByte = [config.BytesPerBuffer]byte{
+var seqByte = [limits.BytesPerBuffer]byte{
 	'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h',
 	'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
 	'q', 'r', 's', 't', 'u', 'v', 'w', 'x',
@@ -94,7 +94,7 @@ func TestBuffer_Read(t *testing.T) {
 				tail:  volatile.Register32{Reg: 32},
 				valid: true,
 			},
-			args:    args{p: make([]byte, config.BytesPerBuffer-1)},
+			args:    args{p: make([]byte, limits.BytesPerBuffer-1)},
 			wantN:   31,
 			wantErr: false,
 			want: &Buffer{

@@ -3,7 +3,7 @@ package line
 import (
 	"bytes"
 
-	"github.com/ardnew/embedit/config"
+	"github.com/ardnew/embedit/config/limits"
 	"github.com/ardnew/embedit/errors"
 	"github.com/ardnew/embedit/seq/key"
 	"github.com/ardnew/embedit/seq/utf8"
@@ -18,10 +18,11 @@ type Line struct {
 	curs  *cursor.Cursor
 	ctrl  *wire.Control
 	disp  *display.Display
-	Rune  [config.RunesPerLine]utf8.Rune
+	Rune  [limits.RunesPerLine]utf8.Rune
 	posi  volatile.Register32
 	head  volatile.Register32
 	tail  volatile.Register32
+	paste bool
 	valid bool
 }
 
@@ -57,6 +58,7 @@ func (l *Line) Reset() *Line {
 	if l == nil || !l.valid {
 		return nil
 	}
+	l.paste = false
 	l.posi.Set(0)
 	l.head.Set(0)
 	l.tail.Set(0)
@@ -67,7 +69,6 @@ func (l *Line) Reset() *Line {
 // I/O buffers to begin processing a new line.
 func (l *Line) LineFeed() {
 	if l != nil && l.ctrl != nil && l.curs != nil {
-		_, _ = l.ctrl.Flush()
 		l.Reset().curs.LineFeed()
 	}
 }
@@ -77,35 +78,21 @@ func (l *Line) Len() (n int) {
 	if l == nil || !l.valid {
 		return 0
 	}
-	ih := l.head.Get() % config.RunesPerLine
-	it := l.tail.Get() % config.RunesPerLine
+	ih := l.head.Get() % limits.RunesPerLine
+	it := l.tail.Get() % limits.RunesPerLine
 	if ih > it {
 		return utf8.RunesLen(l.Rune[ih:]) + utf8.RunesLen(l.Rune[:it])
 	}
 	return utf8.RunesLen(l.Rune[ih:it])
 }
 
-// Clone performs a deep copy of the receiver l by copying the values of each
-// field of l to c. Returns nil if either l or c are nil. Otherwise, returns c.
-//
-// Pointer fields in Line are copied shallowly; i.e., the pointer itself is
-// copied and not dereferenced.
-// func (l *Line) Clone(c *Line) *Line {
-// 	if l == nil || c == nil {
-// 		return nil
-// 	}
-// 	c.curs = l.curs
-// 	c.ctrl = l.ctrl
-// 	c.disp = l.disp
-// 	for i := 0; i < config.RunesPerLine; i++ {
-// 		c.Rune[i] = l.Rune[i]
-// 	}
-// 	c.posi.Set(l.posi.Get())
-// 	c.head.Set(l.head.Get())
-// 	c.tail.Set(l.tail.Get())
-// 	c.valid = l.valid
-// 	return c
-// }
+// IsPasted returns true if and only if the entire line consists only of pasted
+// data.
+func (l *Line) IsPasted() bool { return l.paste }
+
+// SetIsPasted sets the flag that indicates whether the entire line consists
+// only of pasted data.
+func (l *Line) SetIsPasted(paste bool) { l.paste = paste }
 
 // RuneHead returns the head index of l. Implements utf8.Iterator.
 func (l *Line) RuneHead() uint32 { return l.head.Get() }
@@ -114,7 +101,7 @@ func (l *Line) RuneHead() uint32 { return l.head.Get() }
 func (l *Line) RuneTail() uint32 { return l.tail.Get() }
 
 // RuneAt returns the Rune at index i in l. Implements utf8.Iterator.
-func (l *Line) RuneAt(i int) *utf8.Rune { return &l.Rune[i%config.RunesPerLine] }
+func (l *Line) RuneAt(i int) *utf8.Rune { return &l.Rune[i%limits.RunesPerLine] }
 
 // RuneCount returns the total number of runes in l.
 func (l *Line) RuneCount() (count int) {
@@ -166,7 +153,6 @@ func (l *Line) RuneCountToStartOfNextWord() (n int) {
 	head := int(l.head.Get())
 	eol := l.RuneCount()
 	pos := from
-	found := false
 	for pos < eol {
 		if l.RuneAt(head + pos).Equals(' ') {
 			break
@@ -176,16 +162,10 @@ func (l *Line) RuneCountToStartOfNextWord() (n int) {
 	for pos < eol {
 		// We only reach here if a space was found prior to EOL.
 		// So if we find a non-space rune after that, a next word must exist.
-		found = !l.RuneAt(head + pos).Equals(' ')
-		if found {
+		if !l.RuneAt(head + pos).Equals(' ') {
 			break
 		}
 		pos++
-	}
-	// Return 0 if no next word exists.
-	//  (i.e., trailing runes are same word or spaces)
-	if !found {
-		return 0
 	}
 	return pos - from
 }
@@ -212,7 +192,7 @@ func (l *Line) InsertRune(key rune) (err error) {
 		return &errors.ErrInvalidReceiver
 	}
 	h, t := l.head.Get(), l.tail.Get()
-	if t-h >= config.RunesPerLine {
+	if t-h >= limits.RunesPerLine {
 		return &errors.ErrWriteOverflow
 	}
 	l.tail.Set(t + 1)
@@ -227,7 +207,7 @@ func (l *Line) InsertRune(key rune) (err error) {
 		// Temporarily adjust head to rewrite only the changed portion of text.
 		l.head.Set(h + uint32(pos))
 		// Write out the text right-of the insertion.
-		err = l.flush()
+		err = l.Flush()
 		// Reset head back to the actual beginning of the line.
 		l.head.Set(h)
 	}
@@ -260,7 +240,7 @@ func (l *Line) ErasePreviousRuneCount(n int) (err error) {
 	}
 	// Overwrite leading runes with trailing runes
 	h, t := l.head.Get(), l.tail.Get()-uint32(n)
-	if hs, s := h, (utf8.Iterable{Iterator: l}); s.Slice(pos+n, -1) {
+	if hs, s := h, (&utf8.Iterable{Iterator: l}).Slice(pos+n, -1); s != nil {
 		for {
 			r := s.Next()
 			if r.IsError() {
@@ -278,7 +258,7 @@ func (l *Line) ErasePreviousRuneCount(n int) (err error) {
 		// Temporarily adjust head to rewrite only the changed portion of text.
 		l.head.Set(h + uint32(pos))
 		// Write out the text right-of the deletion, including the 0x20 erasors.
-		err = l.flush()
+		err = l.Flush()
 		// Reset head back to the actual beginning of the line.
 		l.head.Set(h)
 	}
@@ -296,13 +276,13 @@ func (l *Line) ErasePreviousRuneCount(n int) (err error) {
 // It does not modify any runes in the buffer, so any operation that flushes l
 // to the output buffer will cause the cleared runes to reappear. Use one of the
 // erase methods to delete runes from the buffer and display.
-func (l *Line) kill() (err error) {
-	_, err = l.ctrl.Out.Write(key.KIL)
-	if _, e := l.ctrl.Flush(); err == nil && e != nil {
-		err = e
-	}
-	return
-}
+// func (l *Line) kill() (err error) {
+// 	_, err = l.ctrl.Out.Write(key.KIL)
+// 	if _, e := l.ctrl.Flush(); err == nil && e != nil {
+// 		err = e
+// 	}
+// 	return
+// }
 
 func (l *Line) ClearScreen() (err error) {
 	_, err = l.ctrl.Out.Write(key.CLS)
@@ -310,12 +290,6 @@ func (l *Line) ClearScreen() (err error) {
 		err = e
 	}
 	l.curs.Set(0, 0)
-	if e := l.ShowPrompt(); err == nil && e != nil {
-		err = e
-	}
-	if e := l.flush(); err == nil && e != nil {
-		err = e
-	}
 	return
 }
 
@@ -335,10 +309,7 @@ func (l *Line) glyphCount(k, n int) (count int) {
 	if n >= 0 {
 		n += k
 	}
-	if s := (utf8.Iterable{Iterator: l}); s.Slice(k, n) {
-		return s.GlyphCount()
-	}
-	return
+	return (&utf8.Iterable{Iterator: l}).Slice(k, n).GlyphCount()
 }
 
 // GlyphCount returns the number of runes in l that are not part of an escape
@@ -350,10 +321,7 @@ func (l *Line) GlyphCount() (count int) {
 // GlyphCountInPrompt returns the number of runes in the user input prompt that
 // are not part of an escape sequence.
 func (l *Line) GlyphCountInPrompt() (count int) {
-	if s := (utf8.Iterable{Iterator: l.disp.PromptIterator()}); s.Reset() {
-		return s.GlyphCount()
-	}
-	return
+	return (&utf8.Iterable{Iterator: l.disp.PromptIterator()}).Reset().GlyphCount()
 }
 
 // Position returns the logical cursor Position in the text of l.
@@ -364,29 +332,27 @@ func (l *Line) Position() int {
 	return int(l.posi.Get())
 }
 
-// MoveCursor appends sequences to the output buffer that move the cursor by the
-// given number of places from the current cursor position, updating l's logical
-// cursor position and the cursor's X, Y coordinates.
-func (l *Line) MoveCursor(places int) (err error) {
-	return l.MoveCursorTo(l.Position() + places)
+func (l *Line) setPosition(position int) int {
+	if position < 0 {
+		position = 0
+	}
+	if end := l.RuneCount(); position > end {
+		position = end
+	}
+	l.posi.Set(uint32(position))
+	return position
 }
 
-// MoveCursorTo appends key sequences to the output buffer that move the cursor
-// to the given logical position in the text, updating l's logical cursor
-// position and the cursor's X, Y coordinates.
-func (l *Line) MoveCursorTo(pos int) (err error) {
-	if pos < 0 {
-		pos = 0
-	}
-	if end := l.RuneCount(); pos > end {
-		pos = end
-	}
-	l.posi.Set(uint32(pos))
+// moveCursorTo appends key sequences to the output buffer that move the cursor
+// to the given logical position in the text, adjusted by offset, and updates
+// l's logical cursor position and the cursor's X, Y coordinates. The offset is
+// typically the number of places in — or width of — the input prompt.
+func (l *Line) moveCursorTo(position, offset int) (err error) {
+	x := offset + l.setPosition(position)
 	if !l.disp.Echo() {
 		return
 	}
 	w := l.disp.Width()
-	x := pos + l.GlyphCountInPrompt()
 	y := x / w
 	x %= w
 	xc, yc := l.curs.Get()
@@ -407,6 +373,20 @@ func (l *Line) MoveCursorTo(pos int) (err error) {
 	return l.curs.Move(du, dd, dl, dr)
 }
 
+// MoveCursorTo appends key sequences to the output buffer that move the cursor
+// to the given logical position in the text, updating l's logical cursor
+// position and the cursor's X, Y coordinates.
+func (l *Line) MoveCursorTo(position int) (err error) {
+	return l.moveCursorTo(position, l.GlyphCountInPrompt())
+}
+
+// MoveCursor appends sequences to the output buffer that move the cursor by the
+// given number of places from the current cursor position, updating l's logical
+// cursor position and the cursor's X, Y coordinates.
+func (l *Line) MoveCursor(places int) (err error) {
+	return l.MoveCursorTo(l.Position() + places)
+}
+
 // Set overwrites the text in l and positions the cursor at the end of the line.
 func (l *Line) Set(s []rune) (err error) {
 	return l.SetAndMoveCursorTo(s, -1)
@@ -415,13 +395,13 @@ func (l *Line) Set(s []rune) (err error) {
 // SetAndMoveCursorTo overwrites the text in l and then sets the logical cursor
 // position to pos.
 // If pos is negative, the cursor is positioned after the last rune in s.
-func (l *Line) SetAndMoveCursorTo(s []rune, pos int) (err error) {
+func (l *Line) SetAndMoveCursorTo(s []rune, position int) (err error) {
 	if l == nil || !l.valid {
 		return &errors.ErrInvalidReceiver
 	}
-	if len(s) > config.RunesPerLine {
+	if len(s) > limits.RunesPerLine {
 		err = &errors.ErrWriteOverflow
-		s = s[:config.RunesPerLine]
+		s = s[:limits.RunesPerLine]
 	}
 	prev := l.RuneCount()
 	curr := len(s)
@@ -438,16 +418,16 @@ func (l *Line) SetAndMoveCursorTo(s []rune, pos int) (err error) {
 			err = e
 		}
 		l.tail.Set(uint32(tail))
-		if e := l.flush(); err == nil && e != nil {
+		if e := l.Flush(); err == nil && e != nil {
 			err = e
 		}
 	}
 	l.tail.Set(uint32(curr))
-	if pos < 0 {
+	if position < 0 {
 		// Position cursor at end of line if pos is negative.
-		pos = curr
+		position = curr
 	}
-	if e := l.MoveCursorTo(pos); err == nil && e != nil {
+	if e := l.MoveCursorTo(position); err == nil && e != nil {
 		err = e
 	}
 	return
@@ -459,29 +439,29 @@ func (l *Line) ShowPrompt() (err error) {
 	if l == nil || !l.valid {
 		return &errors.ErrInvalidReceiver
 	}
-	xc, yc := l.curs.Get()
-	if xc == 0 && yc == 0 {
-		if s := (utf8.Iterable{Iterator: l.disp.PromptIterator()}); s.Reset() {
-			plen := s.GlyphCount()
-			for {
-				if _, rerr := l.ctrl.Out.ReadFrom(s.Next()); rerr != nil {
-					break
-				}
-			}
-			if l.curs.Update(plen) {
-				// If the cursor would write beyond the terminal width (line wrap), then
-				// also append CR+LF to the output buffer.
-				_, _ = l.ctrl.Out.WriteEOL()
-			}
-			_, err = l.ctrl.Flush()
+	// Iterate over prompt elements as Rune elements (instead of native rune),
+	// because it implements an unbuffered io.Reader for copying bytes in each
+	// UTF-8 code point.
+	s := (&utf8.Iterable{Iterator: l.disp.PromptIterator()}).Reset()
+	if s == nil {
+		return &errors.ErrInvalidArgument
+	}
+	for {
+		if _, rerr := l.ctrl.Out.ReadFrom(s.Next()); rerr != nil {
+			break
 		}
 	}
-	return
+	if l.curs.Update(s.Reset().GlyphCount()) {
+		// If the cursor would write beyond the terminal width (line wrap), then
+		// also append CR+LF to the output buffer.
+		_, _ = l.ctrl.Out.WriteEOL()
+	}
+	return l.Flush()
 }
 
-// flush copies all runes in l to the output buffer and advances the cursor's
+// Flush copies all runes in l to the output buffer and advances the cursor's
 // current position to the end of the line.
-func (l *Line) flush() (err error) {
+func (l *Line) Flush() (err error) {
 	width := l.disp.Width()
 	h, t := l.head.Get(), l.tail.Get()
 	for t-h > 0 {
@@ -510,7 +490,6 @@ func (l *Line) flush() (err error) {
 		}
 		h += uint32(seen)
 	}
-	_, err = l.ctrl.Flush()
 	return
 }
 
@@ -543,7 +522,7 @@ func (l *Line) flush() (err error) {
 // 			err = io.EOF
 // 			break
 // 		}
-// 		ih := h % config.RunesPerLine
+// 		ih := h % limits.RunesPerLine
 // 		if ne, erre := l.Rune[ih].Encode(p[n:]); erre == nil {
 // 			n += ne // No encode error, increment total bytes encoded (n).
 // 		} else {
@@ -585,7 +564,7 @@ func (l *Line) Write(p []byte) (n int, err error) {
 	h, t := l.head.Get(), l.tail.Get()
 	r := bytes.NewReader(p)
 	for r.Len() > 0 {
-		if t-h >= config.RunesPerLine {
+		if t-h >= limits.RunesPerLine {
 			break
 		}
 		cu, nu, erru := r.ReadRune()

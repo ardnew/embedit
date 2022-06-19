@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ardnew/embedit"
-	"github.com/ardnew/embedit/seq/key"
 	"github.com/ardnew/embedit/sys"
 )
 
@@ -42,17 +41,17 @@ type mainFunc func() error
 // Available tags are:
 //
 // trace: Traces program execution with package "runtime/trace"
-//   - go build -tags='trace' -gcflags='-m -l' ./examples/stdio/
+//   - go build -tags='history,trace' -gcflags='github.com/ardnew/embedit/...=-m -l' ./examples/stdio/
 //   - ./stdio [-o=stdio.trace]
 //
 // pprof: Profiles program performance with package "runtime/pprof"
-//   - go build -tags='pprof' -gcflags='-m -l' ./examples/stdio/
+//   - go build -tags='history,pprof' -gcflags='github.com/ardnew/embedit/...=-m -l' ./examples/stdio/
 //   - ./stdio [-o=stdio.profile]
 //   - Interactive (CLI): go tool pprof stdio.profile
 //   - Interactive (Web): go tool pprof -http=localhost:8080 stdio.profile
 //
 // pprof_http: pprof but with real-time web server (requires tag pprof)
-//   - go build -tags='pprof,pprof_http' -gcflags='-m -l' ./examples/stdio/
+//   - go build -tags='history,pprof,pprof_http' -gcflags='github.com/ardnew/embedit/...=-m -l' ./examples/stdio/
 //   - ./stdio [-addr=localhost:8080]
 //   - Navigation: http://localhost:8080/debug/pprof
 //   - Export, e.g., heap profile: curl -sK -v http://localhost:8080/debug/pprof/heap > heap.profile
@@ -75,33 +74,33 @@ func Main() error {
 
 	em.Configure(embedit.Config{RW: rw, Width: 80, Height: 24})
 
-	for i := 0; i < options.n; i++ {
-		em.Line().InsertRune('A')
-		em.Line().SetAndMoveCursorTo([]rune("hello testing there"), 10)
-		em.Terminal().PressKey(key.ClearScreen)
-		em.Line().SetAndMoveCursorTo([]rune("there testing hello"), 8)
-		em.Terminal().PressKey(key.Enter)
-		em.Line().SetAndMoveCursorTo([]rune("  hello testing there"), 7)
-		em.Terminal().PressKey(key.DeleteWord)
-		em.Terminal().PressKey(key.DeleteWord)
-		em.Terminal().PressKey(key.CtrlD)
-		em.Terminal().PressKey(key.AltRight)
-		em.Terminal().PressKey(key.CtrlD)
-		em.Terminal().PressKey(key.End)
-		em.Terminal().PressKey(key.Left)
-		em.Terminal().PressKey(key.Backspace)
-		em.Terminal().PressKey(key.AltLeft)
-		em.Terminal().PressKey(key.Home)
-		em.Terminal().PressKey(key.AltRight)
-		em.Terminal().PressKey(key.Right)
-		em.Terminal().PressKey(key.DeleteLine)
-		em.Terminal().PressKey(key.AltLeft)
-		em.Terminal().PressKey(key.Left)
-		em.Terminal().PressKey(key.CtrlU)
-		em.Line().InsertRune('X')
-		em.Line().Set([]rune("wat"))
-
+	for {
+		if err := em.Terminal().ReadLine(); err != nil {
+			return err
+		}
+		// em.Line().InsertRune('A')
+		// em.Line().SetAndMoveCursorTo([]rune("hello testing there"), 10)
+		// em.Terminal().PressKey(key.ClearScreen)
+		// em.Line().SetAndMoveCursorTo([]rune("there testing hello"), 8)
+		// em.Terminal().PressKey(key.Enter)
+		// em.Line().SetAndMoveCursorTo([]rune("  hello testing there"), 7)
+		// em.Terminal().PressKey(key.DeleteWord)
+		// em.Terminal().PressKey(key.DeleteWord)
+		// em.Terminal().PressKey(key.CtrlD)
+		// em.Terminal().PressKey(key.AltRight)
+		// em.Terminal().PressKey(key.CtrlD)
+		// em.Terminal().PressKey(key.End)
+		// em.Terminal().PressKey(key.Left)
+		// em.Terminal().PressKey(key.Backspace)
+		// em.Terminal().PressKey(key.AltLeft)
+		// em.Terminal().PressKey(key.Home)
+		// em.Terminal().PressKey(key.AltRight)
+		// em.Terminal().PressKey(key.Right)
+		// em.Terminal().PressKey(key.DeleteLine)
+		// em.Terminal().PressKey(key.AltLeft)
+		// em.Terminal().PressKey(key.Left)
+		// em.Terminal().PressKey(key.CtrlU)
+		// em.Line().InsertRune('X')
+		// em.Line().Set([]rune("wat"))
 	}
-
-	return nil
 }

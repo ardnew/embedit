@@ -8,6 +8,7 @@ package errors
 // OutOfRange
 // WriteOverflow
 // ReadOverflow
+// PasteIndicator
 
 type (
 	InvalidReceiver struct{}
@@ -15,6 +16,7 @@ type (
 	OutOfRange      struct{}
 	WriteOverflow   struct{}
 	ReadOverflow    struct{}
+	PasteIndicator  struct{}
 )
 
 var (
@@ -23,6 +25,7 @@ var (
 	ErrOutOfRange      OutOfRange
 	ErrWriteOverflow   WriteOverflow
 	ErrReadOverflow    ReadOverflow
+	ErrPasteIndicator  PasteIndicator
 )
 
 func (e *InvalidReceiver) Error() string {
@@ -43,4 +46,8 @@ func (e *WriteOverflow) Error() string {
 
 func (e *ReadOverflow) Error() string {
 	return "read overflow"
+}
+
+func (e *PasteIndicator) Error() string {
+	return "paste indicator"
 }

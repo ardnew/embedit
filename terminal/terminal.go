@@ -3,7 +3,8 @@ package terminal
 import (
 	"io"
 
-	"github.com/ardnew/embedit/config"
+	"github.com/ardnew/embedit/config/limits"
+	"github.com/ardnew/embedit/errors"
 	"github.com/ardnew/embedit/seq"
 	"github.com/ardnew/embedit/seq/eol"
 	"github.com/ardnew/embedit/seq/key"
@@ -54,8 +55,6 @@ func (t *Terminal) Configure(
 func (t *Terminal) init() *Terminal {
 	t.valid = true
 	t.paste = paste.Inactive
-	t.Line().ShowPrompt()
-	t.Line().Set(nil)
 	return t
 }
 
@@ -79,92 +78,44 @@ func (t *Terminal) Line() *line.Line {
 	return t.history.Line()
 }
 
-// func (t *Terminal) readLine() (err error) {
-// 	l := t.Line()
-
-// 	if t.cursorX == 0 && t.cursorY == 0 {
-// 		t.writeLine(t.prompt)
-// 		t.c.Write(t.outBuf)
-// 		t.outBuf = t.outBuf[:0]
-// 	}
-
-// 	lineIsPasted := t.pasteActive
-
-// 	for {
-// 		rest := t.remainder
-// 		lineOk := false
-// 		for !lineOk {
-// 			var key rune
-// 			key, rest = bytesToKey(rest, t.pasteActive)
-// 			if key == utf8.RuneError {
-// 				break
-// 			}
-// 			if !t.pasteActive {
-// 				if key == keyCtrlD {
-// 					if len(t.line) == 0 {
-// 						return "", io.EOF
-// 					}
-// 				}
-// 				if key == keyCtrlC {
-// 					return "", io.EOF
-// 				}
-// 				if key == keyPasteStart {
-// 					t.pasteActive = true
-// 					if len(t.line) == 0 {
-// 						lineIsPasted = true
-// 					}
-// 					continue
-// 				}
-// 			} else if key == keyPasteEnd {
-// 				t.pasteActive = false
-// 				continue
-// 			}
-// 			if !t.pasteActive {
-// 				lineIsPasted = false
-// 			}
-// 			line, lineOk = t.handleKey(key)
-// 		}
-// 		if len(rest) > 0 {
-// 			n := copy(t.inBuf[:], rest)
-// 			t.remainder = t.inBuf[:n]
-// 		} else {
-// 			t.remainder = nil
-// 		}
-// 		t.c.Write(t.outBuf)
-// 		t.outBuf = t.outBuf[:0]
-// 		if lineOk {
-// 			if t.echo {
-// 				t.historyIndex = -1
-// 				t.history.Add(line)
-// 			}
-// 			if lineIsPasted {
-// 				err = ErrPasteIndicator
-// 			}
-// 			return
-// 		}
-
-// 		// t.remainder is a slice at the beginning of t.inBuf
-// 		// containing a partial key sequence
-// 		readBuf := t.inBuf[len(t.remainder):]
-// 		var n int
-
-// 		t.lock.Unlock()
-// 		n, err = t.c.Read(readBuf)
-// 		t.lock.Lock()
-
-// 		if err != nil {
-// 			return
-// 		}
-
-// 		t.remainder = t.inBuf[:n+len(t.remainder)]
-// 	}
-// }
+func (t *Terminal) ReadLine() (err error) {
+	l := t.Line()
+	if err = l.ShowPrompt(); err != nil {
+		return
+	}
+	eol := false
+	for !eol {
+		for t.in.Len() > 0 {
+			k, sz := t.in.Parse(t.paste.IsActive())
+			if k == key.Error || sz == 0 {
+				break
+			}
+			eol, err = t.PressKey(k)
+		}
+		if eol {
+			if t.display.Echo() {
+				t.history.Add()
+				t.out.WriteEOL()
+			}
+			if l.IsPasted() {
+				err = &errors.ErrPasteIndicator
+			}
+			t.Flush()
+		} else {
+			t.Flush()
+			t.Swell()
+		}
+	}
+	return
+}
 
 // PressKey processes a given keypress on the current line.
-func (t *Terminal) PressKey(k rune) (ok bool) {
+func (t *Terminal) PressKey(k rune) (eol bool, err error) {
 	l := t.Line()
-	if t.paste.IsActive() && k != key.Enter {
-		return l.InsertRune(k) == nil
+	// If we are actively pasting, all keys other than Enter and the end-of-paste
+	// sequence should be inserted literally into the line.
+	if t.paste.IsActive() && k != key.Enter && k != key.PasteEnd {
+		return false, l.InsertRune(k)
 	}
 
 	pos := l.Position()
@@ -172,79 +123,70 @@ func (t *Terminal) PressKey(k rune) (ok bool) {
 	// viz := l.GlyphCount()
 
 	switch k {
-	case key.Backspace:
-		if pos == 0 {
-			return
-		}
-		ok = l.ErasePreviousRuneCount(1) == nil
-
-	case key.AltLeft:
-		// Move left by 1 word.
-		ok = l.MoveCursor(-l.RuneCountToStartOfWord()) == nil
-
-	case key.AltRight:
-		// Move right by 1 word.
-		ok = l.MoveCursor(+l.RuneCountToStartOfNextWord()) == nil
-
-	case key.Left:
-		if pos == 0 {
-			return
-		}
-		ok = l.MoveCursor(-1) == nil
-
-	case key.Right:
-		if pos == siz {
-			return
-		}
-		ok = l.MoveCursor(+1) == nil
-
-	case key.Home:
-		if pos == 0 {
-			return
-		}
-		ok = l.MoveCursorTo(0) == nil
-
-	case key.End:
-		if pos == siz {
-			return
-		}
-		ok = l.MoveCursorTo(siz) == nil
-
-		/*
-			case key.Up:
-				entry, ok := t.history.NthPreviousEntry(t.historyIndex + 1)
-				if !ok {
-					return "", false
-				}
-				if t.historyIndex == -1 {
-					t.historyPending = string(t.line)
-				}
-				t.historyIndex++
-				runes := []rune(entry)
-				t.setLine(runes, len(runes))
-			case key.Down:
-				switch t.historyIndex {
-				case -1:
-					return
-				case 0:
-					runes := []rune(t.historyPending)
-					t.setLine(runes, len(runes))
-					t.historyIndex--
-				default:
-					entry, ok := t.history.NthPreviousEntry(t.historyIndex - 1)
-					if ok {
-						t.historyIndex--
-						runes := []rune(entry)
-						t.setLine(runes, len(runes))
-					}
-				}
-		*/
 
 	case key.Enter:
 		l.MoveCursorTo(siz)
-		t.out.WriteEOL()
-		l.LineFeed()
-		l.ShowPrompt()
+		eol = true
+
+	case key.Backspace:
+		if pos > 0 {
+			l.ErasePreviousRuneCount(1)
+		}
+
+	case key.CtrlC:
+		eol = true
+		err = io.ErrUnexpectedEOF
+
+	case key.CtrlD:
+		if siz == 0 {
+			eol = true
+			err = io.EOF
+		} else if pos < siz {
+			// Erase the character under the current position — "rubout".
+			l.MoveCursor(+1)
+			l.ErasePreviousRuneCount(1)
+		}
+
+	case key.Up:
+		t.history.Back()
+
+	case key.Down:
+		t.history.Forward()
+
+	case key.Left:
+		if pos > 0 {
+			l.MoveCursor(-1)
+		}
+
+	case key.Right:
+		if pos < siz {
+			l.MoveCursor(+1)
+		}
+
+	case key.AltLeft:
+		// Move left by 1 word.
+		l.MoveCursor(-l.RuneCountToStartOfWord())
+
+	case key.AltRight:
+		// Move right by 1 word.
+		l.MoveCursor(+l.RuneCountToStartOfNextWord())
+
+	case key.Home:
+		if pos > 0 {
+			l.MoveCursorTo(0)
+		}
+
+	case key.End:
+		if pos < siz {
+			l.MoveCursorTo(siz)
+		}
+
+	case key.Delete:
+		if pos < siz {
+			// Erase the character under the current position — "rubout".
+			l.MoveCursor(+1)
+			l.ErasePreviousRuneCount(1)
+		}
 
 	case key.DeleteWord:
 		// Move to the end of the current word iff cursor is not on white space.
@@ -252,26 +194,28 @@ func (t *Terminal) PressKey(k rune) (ok bool) {
 		// Delete zero or more spaces and then one or more characters.
 		l.ErasePreviousRuneCount(l.RuneCountToStartOfWord())
 
-	case key.DeleteLine:
+	case key.DeleteLeading:
+		// Delete everything from the current cursor position to the start of line.
+		l.ErasePreviousRuneCount(pos)
+
+	case key.DeleteTrailing:
 		// Delete everything from the current cursor position to the end of line.
 		l.MoveCursorTo(siz)
 		l.ErasePreviousRuneCount(siz - pos)
-
-	case key.CtrlD:
-		// Erase the character under the current position. The EOF case when the
-		// line is empty is handled in readLine().
-		if pos < siz {
-			l.MoveCursor(+1)
-			l.ErasePreviousRuneCount(1)
-		}
-
-	case key.CtrlU:
-		l.ErasePreviousRuneCount(pos)
 
 	case key.ClearScreen:
 		// Erase the screen and move the cursor to the home position.
 		l.ClearScreen()
 		l.ShowPrompt()
+
+	case key.PasteStart:
+		t.paste = paste.Active
+		if siz == 0 {
+			l.SetIsPasted(true)
+		}
+
+	case key.PasteEnd:
+		t.paste = paste.Inactive
 
 	default:
 		// if t.AutoCompleteCallback != nil {
@@ -287,13 +231,15 @@ func (t *Terminal) PressKey(k rune) (ok bool) {
 		// 		return
 		// 	}
 		// }
-		if !key.IsPrintable(k) {
-			return
+		if siz < limits.RunesPerLine {
+			// If we've reached here, then we are inserting a key outside of a bracketed
+			// paste operation.
+			l.SetIsPasted(false)
+
+			if key.IsPrintable(k) {
+				err = l.InsertRune(k)
+			}
 		}
-		if l.RuneCount() == config.RunesPerLine {
-			return
-		}
-		l.InsertRune(k)
 
 	}
 	return
