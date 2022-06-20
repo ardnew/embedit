@@ -1,8 +1,8 @@
 package cursor
 
 import (
+	"github.com/ardnew/embedit/seq/ansi"
 	"github.com/ardnew/embedit/seq/ascii"
-	"github.com/ardnew/embedit/seq/key"
 	"github.com/ardnew/embedit/terminal/display"
 	"github.com/ardnew/embedit/terminal/wire"
 	"github.com/ardnew/embedit/volatile"
@@ -15,12 +15,14 @@ type Cursor struct {
 	x, y  volatile.Register32 // X=0: left edge; Y=0: first row, current Line
 	maxY  volatile.Register32 // Greatest value of Y so far
 	ascii ascii.Uint32
+	flush bool
 	valid bool
 }
 
 // Configure initializes the Cursor configuration.
-func (c *Cursor) Configure(ctrl *wire.Control, disp *display.Display) *Cursor {
+func (c *Cursor) Configure(flush bool, ctrl *wire.Control, disp *display.Display) *Cursor {
 	c.valid = false
+	c.flush = flush
 	c.ctrl = ctrl
 	c.disp = disp
 	return c.init()
@@ -45,6 +47,16 @@ func (c *Cursor) LineFeed() {
 	if c != nil && c.ctrl != nil {
 		_ = c.Reset().ctrl.Reset()
 	}
+}
+
+// EnableAutoFlush enables or disables auto-flush.
+func (c *Cursor) EnableAutoFlush(enable bool) (wasEnabled bool) {
+	if c == nil || !c.valid {
+		return false
+	}
+	wasEnabled = c.flush
+	c.flush = enable
+	return
 }
 
 func (c *Cursor) Control() *wire.Control    { return c.ctrl }
@@ -122,11 +134,11 @@ func (c *Cursor) Move(up, down, left, right int) (err error) {
 	// - - - - - - - - - - - - - - - - - - - -
 	// Up
 	if up == 1 {
-		c.ctrl.Out.WriteByte(key.Escape)
+		c.ctrl.Out.WriteByte(ansi.Escape)
 		c.ctrl.Out.WriteByte('[')
 		c.ctrl.Out.WriteByte('A')
 	} else if up > 1 {
-		c.ctrl.Out.WriteByte(key.Escape)
+		c.ctrl.Out.WriteByte(ansi.Escape)
 		c.ctrl.Out.WriteByte('[')
 		c.ascii.Val = uint32(up)
 		c.ascii.WriteTo(c.ctrl.Out)
@@ -135,11 +147,11 @@ func (c *Cursor) Move(up, down, left, right int) (err error) {
 	// - - - - - - - - - - - - - - - - - - - -
 	// Down
 	if down == 1 {
-		c.ctrl.Out.WriteByte(key.Escape)
+		c.ctrl.Out.WriteByte(ansi.Escape)
 		c.ctrl.Out.WriteByte('[')
 		c.ctrl.Out.WriteByte('B')
 	} else if down > 1 {
-		c.ctrl.Out.WriteByte(key.Escape)
+		c.ctrl.Out.WriteByte(ansi.Escape)
 		c.ctrl.Out.WriteByte('[')
 		c.ascii.Val = uint32(down)
 		c.ascii.WriteTo(c.ctrl.Out)
@@ -148,11 +160,11 @@ func (c *Cursor) Move(up, down, left, right int) (err error) {
 	// - - - - - - - - - - - - - - - - - - - -
 	// Left
 	if left == 1 {
-		c.ctrl.Out.WriteByte(key.Escape)
+		c.ctrl.Out.WriteByte(ansi.Escape)
 		c.ctrl.Out.WriteByte('[')
 		c.ctrl.Out.WriteByte('D')
 	} else if left > 1 {
-		c.ctrl.Out.WriteByte(key.Escape)
+		c.ctrl.Out.WriteByte(ansi.Escape)
 		c.ctrl.Out.WriteByte('[')
 		c.ascii.Val = uint32(left)
 		c.ascii.WriteTo(c.ctrl.Out)
@@ -161,15 +173,26 @@ func (c *Cursor) Move(up, down, left, right int) (err error) {
 	// - - - - - - - - - - - - - - - - - - - -
 	// Right
 	if right == 1 {
-		c.ctrl.Out.WriteByte(key.Escape)
+		c.ctrl.Out.WriteByte(ansi.Escape)
 		c.ctrl.Out.WriteByte('[')
 		c.ctrl.Out.WriteByte('C')
 	} else if right > 1 {
-		c.ctrl.Out.WriteByte(key.Escape)
+		c.ctrl.Out.WriteByte(ansi.Escape)
 		c.ctrl.Out.WriteByte('[')
 		c.ascii.Val = uint32(right)
 		c.ascii.WriteTo(c.ctrl.Out)
 		c.ctrl.Out.WriteByte('C')
 	}
+	if c.flush {
+		c.ctrl.Flush()
+	}
 	return
+}
+
+func (c *Cursor) WriteBuf(buf []byte) {
+	for _, b := range buf {
+		c.ascii.Val = uint32(b)
+		c.ascii.WriteTo(c.ctrl.Out)
+		c.ctrl.Out.WriteByte(ascii.SP)
+	}
 }

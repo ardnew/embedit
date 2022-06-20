@@ -19,6 +19,6 @@ const BytesPerBuffer = MaxBytesPerRune * RunesPerLine // Max bytes per 1 line
 // Note that this probably isn't large enough for every possible valid key code
 // byte sequence, but we need to place a reasonable upper bound on this space.
 //
-// Using ansi.go as reference (github.com/ardnew/embedit/seq/key), the widest
-// keycode appears to be 16-bit
+// Using escape.go as reference (github.com/ardnew/embedit/seq/ansi), the widest
+// sequence recognized appears to be 6 bytes.
 const MaxBytesPerKey = 2 * MaxBytesPerRune // TBD: Is there a _correct_ value?

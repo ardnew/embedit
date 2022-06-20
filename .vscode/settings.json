@@ -71,4 +71,8 @@
   // ------------ Settings beyond this line have not been reviewed! ------------
   // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   "": {},
+  "go.toolsEnvVars": {
+    "GOROOT": "/home/andrew/.cache/tinygo/goroot-6d3990fc90327b85cfc63e14b45629be69c0fbc62e4fc96814de999d11f69b97",
+    "GOFLAGS": "-tags=cortexm,baremetal,linux,arm,nrf52840,nrf,clue_alpha,nrf52840_reset_uf2,softdevice,s140v6,tinygo,math_big_pure_go,gc.conservative,scheduler.tasks,serial.usb"
+  },
 }

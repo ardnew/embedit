@@ -7,11 +7,11 @@ import (
 	"github.com/ardnew/embedit/errors"
 	"github.com/ardnew/embedit/seq"
 	"github.com/ardnew/embedit/seq/eol"
-	"github.com/ardnew/embedit/seq/key"
 	"github.com/ardnew/embedit/terminal/clipboard/paste"
 	"github.com/ardnew/embedit/terminal/cursor"
 	"github.com/ardnew/embedit/terminal/display"
 	"github.com/ardnew/embedit/terminal/history"
+	"github.com/ardnew/embedit/terminal/key"
 	"github.com/ardnew/embedit/terminal/line"
 	"github.com/ardnew/embedit/terminal/wire"
 )
@@ -37,12 +37,14 @@ type Terminal struct {
 
 // Configure initializes the Terminal configuration.
 func (t *Terminal) Configure(
-	rw io.ReadWriter, prompt []rune, width, height int,
+	rw io.ReadWriter, prompt []rune, width, height int, flush bool,
 ) *Terminal {
 	t.valid = false
 	t.rw = rw
 	t.history.Configure(
+		flush,
 		t.cursor.Configure(
+			flush,
 			t.control.Configure(t,
 				t.in.Configure(eol.LF),
 				t.out.Configure(eol.CRLF)),
@@ -79,6 +81,8 @@ func (t *Terminal) Line() *line.Line {
 }
 
 func (t *Terminal) ReadLine() (err error) {
+	wasEnabled := t.display.EnablePrompt(true)
+	defer t.display.EnablePrompt(wasEnabled)
 	l := t.Line()
 	if err = l.ShowPrompt(); err != nil {
 		return
@@ -87,16 +91,19 @@ func (t *Terminal) ReadLine() (err error) {
 	for !eol {
 		for t.in.Len() > 0 {
 			k, sz := t.in.Parse(t.paste.IsActive())
-			if k == key.Error || sz == 0 {
-				break
+			if k == key.Unknown {
+				l.MoveCursorTo(l.RuneCount())
+				t.out.WriteEOL()
+				t.cursor.WriteBuf(t.in.Last())
+				eol = true
+			} else {
+				if k == key.Error || sz == 0 {
+					break
+				}
+				eol, err = t.HandleKey(k)
 			}
-			eol, err = t.PressKey(k)
 		}
 		if eol {
-			if t.display.Echo() {
-				t.history.Add()
-				t.out.WriteEOL()
-			}
 			if l.IsPasted() {
 				err = &errors.ErrPasteIndicator
 			}
@@ -109,8 +116,17 @@ func (t *Terminal) ReadLine() (err error) {
 	return
 }
 
-// PressKey processes a given keypress on the current line.
-func (t *Terminal) PressKey(k rune) (eol bool, err error) {
+func (t *Terminal) HandleKey(k rune) (eol bool, err error) {
+	eol, err = t.handleKey(k)
+	if eol && t.display.Echo() {
+		t.history.Add()
+		t.out.WriteEOL()
+	}
+	return
+}
+
+// HandleKey processes a given keypress on the current line.
+func (t *Terminal) handleKey(k rune) (eol bool, err error) {
 	l := t.Line()
 	// If we are actively pasting, all keys other than Enter and the end-of-paste
 	// sequence should be inserted literally into the line.
@@ -120,7 +136,6 @@ func (t *Terminal) PressKey(k rune) (eol bool, err error) {
 
 	pos := l.Position()
 	siz := l.RuneCount()
-	// viz := l.GlyphCount()
 
 	switch k {
 
@@ -133,11 +148,11 @@ func (t *Terminal) PressKey(k rune) (eol bool, err error) {
 			l.ErasePreviousRuneCount(1)
 		}
 
-	case key.CtrlC:
+	case key.Interrupt:
 		eol = true
 		err = io.ErrUnexpectedEOF
 
-	case key.CtrlD:
+	case key.EndOfFile:
 		if siz == 0 {
 			eol = true
 			err = io.EOF
@@ -194,11 +209,11 @@ func (t *Terminal) PressKey(k rune) (eol bool, err error) {
 		// Delete zero or more spaces and then one or more characters.
 		l.ErasePreviousRuneCount(l.RuneCountToStartOfWord())
 
-	case key.DeleteLeading:
+	case key.KillPrevious:
 		// Delete everything from the current cursor position to the start of line.
 		l.ErasePreviousRuneCount(pos)
 
-	case key.DeleteTrailing:
+	case key.Kill:
 		// Delete everything from the current cursor position to the end of line.
 		l.MoveCursorTo(siz)
 		l.ErasePreviousRuneCount(siz - pos)

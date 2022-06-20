@@ -2,15 +2,15 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "stdio: build",
+      "label": "analysis: build",
       "type": "shell",
       "command": "go",
       "detail": "Build with debug disabled, profile disabled, and trace disabled",
       "args": [
           "build",
           "-tags=history",
-          "-o=.vscode/build/examples/stdio/build.bin",
-          "./examples/stdio"
+          "-o=.vscode/build/examples/analysis/build.bin",
+          "./examples/analysis"
       ],
       "runOptions": {
         "instanceLimit": 1,
@@ -21,7 +21,7 @@
       },
     },
     {
-      "label": "stdio: debug",
+      "label": "analysis: debug",
       "type": "shell",
       "command": "go",
       "detail": "Build with debug enabled, profile disabled, and trace disabled",
@@ -29,8 +29,8 @@
           "build",
           "-tags=history",
           "-gcflags=all=-N -l",
-          "-o=.vscode/build/examples/stdio/debug.bin",
-          "./examples/stdio",
+          "-o=.vscode/build/examples/analysis/debug.bin",
+          "./examples/analysis",
       ],
       "runOptions": {
         "instanceLimit": 1,
@@ -41,7 +41,7 @@
       },
     },
     {
-      "label": "stdio: profile",
+      "label": "analysis: profile",
       "type": "shell",
       "command": "go",
       "detail": "Build with debug enabled, profile enabled, and trace disabled",
@@ -49,8 +49,8 @@
           "build",
           "-tags=history,pprof",
           "-gcflags=all=-N -l -m",
-          "-o=.vscode/build/examples/stdio/profile.bin",
-          "./examples/stdio",
+          "-o=.vscode/build/examples/analysis/profile.bin",
+          "./examples/analysis",
       ],
       "runOptions": {
         "instanceLimit": 1,
@@ -61,7 +61,7 @@
       },
     },
     {
-      "label": "stdio: trace",
+      "label": "analysis: trace",
       "type": "shell",
       "command": "go",
       "detail": "Build with debug enabled, profile disabled, and trace enabled",
@@ -69,8 +69,8 @@
           "build",
           "-tags=history,trace",
           "-gcflags=all=-N -l -m",
-          "-o=.vscode/build/examples/stdio/trace.bin",
-          "./examples/stdio",
+          "-o=.vscode/build/examples/analysis/trace.bin",
+          "./examples/analysis",
       ],
       "runOptions": {
         "instanceLimit": 1,

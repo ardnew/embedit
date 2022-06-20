@@ -8,11 +8,13 @@ import (
 
 // Display defines a terminal display's viewport.
 type Display struct {
-	prompt []rune
-	width  volatile.Register32
-	height volatile.Register32
-	echo   volatile.Register8
-	valid  bool
+	promptIterable utf8.Iterable
+	prompt         []rune
+	promptEnabled  bool
+	width          volatile.Register32
+	height         volatile.Register32
+	echo           volatile.Register8
+	valid          bool
 }
 
 // Configure initializes the Display configuration.
@@ -94,18 +96,38 @@ func (d *Display) SetEcho(echo bool) {
 
 // Prompt returns the user input prompt.
 func (d *Display) Prompt() []rune {
-	if d == nil || !d.valid || d.prompt == nil {
+	if d == nil || !d.valid || !d.promptEnabled {
+		return nil
+	}
+	if d.prompt == nil {
 		return defaults.Prompt
 	}
 	return d.prompt
 }
 
-// PromptIterator returns the user input prompt as utf8.RuneIterator.
-func (d *Display) PromptIterator() utf8.Iterator {
-	if d == nil || !d.valid || d.prompt == nil {
+// promptIterator returns the user input prompt as utf8.RuneIterator.
+func (d *Display) promptIterator() utf8.Iterator {
+	if d.prompt == nil {
 		return (*utf8.IterableRune)(&defaults.Prompt)
 	}
 	return (*utf8.IterableRune)(&d.prompt)
+}
+
+// promptIterator returns the user input prompt as utf8.RuneIterator.
+func (d *Display) PromptIterable() *utf8.Iterable {
+	if d == nil || !d.valid || !d.promptEnabled {
+		return nil
+	}
+	return &d.promptIterable
+}
+
+// GlyphCountInPrompt returns the number of runes in the user input prompt that
+// are not part of an escape sequence.
+func (d *Display) GlyphCountInPrompt() (count int) {
+	if d == nil || !d.valid || !d.promptEnabled {
+		return 0
+	}
+	return d.promptIterable.Reset().GlyphCount()
 }
 
 // SetPrompt sets the user input prompt.
@@ -118,5 +140,16 @@ func (d *Display) SetPrompt(prompt []rune) {
 		} else {
 			d.prompt = prompt
 		}
+		d.promptIterable.Iterator = d.promptIterator()
 	}
+}
+
+// EnablePrompt enables or disables the user input prompt.
+func (d *Display) EnablePrompt(enable bool) (wasEnabled bool) {
+	if d == nil || !d.valid {
+		return false
+	}
+	wasEnabled = d.promptEnabled
+	d.promptEnabled = enable
+	return
 }

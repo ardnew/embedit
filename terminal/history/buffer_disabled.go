@@ -29,3 +29,9 @@ func (h *History) Add() {
 	// Reset the cursor, data, and I/O buffers.
 	h.pend.LineFeed()
 }
+
+func (h *History) Back() {
+}
+
+func (h *History) Forward() {
+}

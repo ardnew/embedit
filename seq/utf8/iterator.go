@@ -37,6 +37,8 @@ func (ir *IterableRune) RuneTail() uint32 { return uint32(len(*ir)) }
 // Implements Iterator for native Go type []rune.
 func (ir *IterableRune) RuneAt(i int) *Rune { return (*Rune)(&(*ir)[i]) }
 
+var NonIterableRune IterableRune
+
 // Iterable defines a concrete implementation of an Iterator that provides
 // type-agnostic methods over the interface.
 type Iterable struct {

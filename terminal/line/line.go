@@ -5,7 +5,7 @@ import (
 
 	"github.com/ardnew/embedit/config/limits"
 	"github.com/ardnew/embedit/errors"
-	"github.com/ardnew/embedit/seq/key"
+	"github.com/ardnew/embedit/seq/ansi"
 	"github.com/ardnew/embedit/seq/utf8"
 	"github.com/ardnew/embedit/terminal/cursor"
 	"github.com/ardnew/embedit/terminal/display"
@@ -22,12 +22,14 @@ type Line struct {
 	posi  volatile.Register32
 	head  volatile.Register32
 	tail  volatile.Register32
+	iter  utf8.Iterable
+	flush bool
 	paste bool
 	valid bool
 }
 
 // Configure initializes the Line configuration.
-func (l *Line) Configure(curs *cursor.Cursor) *Line {
+func (l *Line) Configure(flush bool, curs *cursor.Cursor) *Line {
 	if l == nil {
 		return nil
 	}
@@ -37,7 +39,9 @@ func (l *Line) Configure(curs *cursor.Cursor) *Line {
 		return l
 	}
 	l.valid = false
+	l.flush = flush
 	l.curs = curs
+	l.iter.Iterator = l
 	return l.init()
 }
 
@@ -62,6 +66,7 @@ func (l *Line) Reset() *Line {
 	l.posi.Set(0)
 	l.head.Set(0)
 	l.tail.Set(0)
+	l.iter.Reset()
 	return l
 }
 
@@ -71,6 +76,16 @@ func (l *Line) LineFeed() {
 	if l != nil && l.ctrl != nil && l.curs != nil {
 		l.Reset().curs.LineFeed()
 	}
+}
+
+// EnableAutoFlush enables or disables auto-flush.
+func (l *Line) EnableAutoFlush(enable bool) (wasEnabled bool) {
+	if l == nil || !l.valid {
+		return false
+	}
+	wasEnabled = l.flush
+	l.flush = enable
+	return
 }
 
 // Len returns the number of bytes in l.
@@ -214,6 +229,9 @@ func (l *Line) InsertRune(key rune) (err error) {
 	if e := l.MoveCursorTo(int(pos) + 1); err == nil && e != nil {
 		err = e
 	}
+	if l.flush {
+		l.ctrl.Flush()
+	}
 	return
 }
 
@@ -240,7 +258,7 @@ func (l *Line) ErasePreviousRuneCount(n int) (err error) {
 	}
 	// Overwrite leading runes with trailing runes
 	h, t := l.head.Get(), l.tail.Get()-uint32(n)
-	if hs, s := h, (&utf8.Iterable{Iterator: l}).Slice(pos+n, -1); s != nil {
+	if hs, s := h, l.iter.Slice(pos+n, -1); s != nil {
 		for {
 			r := s.Next()
 			if r.IsError() {
@@ -267,29 +285,21 @@ func (l *Line) ErasePreviousRuneCount(n int) (err error) {
 	if e := l.MoveCursorTo(pos); err == nil && e != nil {
 		err = e
 	}
+	if l.flush {
+		l.ctrl.Flush()
+	}
 	return
 }
 
-// kill appends an escape sequence to the output buffer that clears the line
-// from the current cursor position to the end of the line.
-//
-// It does not modify any runes in the buffer, so any operation that flushes l
-// to the output buffer will cause the cleared runes to reappear. Use one of the
-// erase methods to delete runes from the buffer and display.
-// func (l *Line) kill() (err error) {
-// 	_, err = l.ctrl.Out.Write(key.KIL)
-// 	if _, e := l.ctrl.Flush(); err == nil && e != nil {
-// 		err = e
-// 	}
-// 	return
-// }
-
 func (l *Line) ClearScreen() (err error) {
-	_, err = l.ctrl.Out.Write(key.CLS)
-	if _, e := l.ctrl.Out.Write(key.XY0); err == nil && e != nil {
+	_, err = l.ctrl.Out.Write(ansi.CLS)
+	if _, e := l.ctrl.Out.Write(ansi.XY0); err == nil && e != nil {
 		err = e
 	}
 	l.curs.Set(0, 0)
+	if l.flush {
+		l.ctrl.Flush()
+	}
 	return
 }
 
@@ -309,19 +319,13 @@ func (l *Line) glyphCount(k, n int) (count int) {
 	if n >= 0 {
 		n += k
 	}
-	return (&utf8.Iterable{Iterator: l}).Slice(k, n).GlyphCount()
+	return l.iter.Slice(k, n).GlyphCount()
 }
 
 // GlyphCount returns the number of runes in l that are not part of an escape
 // sequence.
 func (l *Line) GlyphCount() (count int) {
 	return l.glyphCount(0, -1)
-}
-
-// GlyphCountInPrompt returns the number of runes in the user input prompt that
-// are not part of an escape sequence.
-func (l *Line) GlyphCountInPrompt() (count int) {
-	return (&utf8.Iterable{Iterator: l.disp.PromptIterator()}).Reset().GlyphCount()
 }
 
 // Position returns the logical cursor Position in the text of l.
@@ -377,7 +381,7 @@ func (l *Line) moveCursorTo(position, offset int) (err error) {
 // to the given logical position in the text, updating l's logical cursor
 // position and the cursor's X, Y coordinates.
 func (l *Line) MoveCursorTo(position int) (err error) {
-	return l.moveCursorTo(position, l.GlyphCountInPrompt())
+	return l.moveCursorTo(position, l.disp.GlyphCountInPrompt())
 }
 
 // MoveCursor appends sequences to the output buffer that move the cursor by the
@@ -430,6 +434,9 @@ func (l *Line) SetAndMoveCursorTo(s []rune, position int) (err error) {
 	if e := l.MoveCursorTo(position); err == nil && e != nil {
 		err = e
 	}
+	if l.flush {
+		l.ctrl.Flush()
+	}
 	return
 }
 
@@ -442,7 +449,7 @@ func (l *Line) ShowPrompt() (err error) {
 	// Iterate over prompt elements as Rune elements (instead of native rune),
 	// because it implements an unbuffered io.Reader for copying bytes in each
 	// UTF-8 code point.
-	s := (&utf8.Iterable{Iterator: l.disp.PromptIterator()}).Reset()
+	s := l.disp.PromptIterable().Reset()
 	if s == nil {
 		return &errors.ErrInvalidArgument
 	}
@@ -489,6 +496,9 @@ func (l *Line) Flush() (err error) {
 			}
 		}
 		h += uint32(seen)
+	}
+	if l.flush {
+		l.ctrl.Flush()
 	}
 	return
 }

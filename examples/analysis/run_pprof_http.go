@@ -32,7 +32,7 @@ func run(fn mainFunc) (err error) {
 }
 
 func parseFlags() (err error) {
-	fs := flag.NewFlagSet(pkgName, flag.ExitOnError)
+	fs := flag.NewFlagSet(binName, flag.ExitOnError)
 
 	fs.IntVar(&options.n, "n", options.n,
 		"Number of `iterations`")

@@ -18,7 +18,7 @@ type History struct {
 }
 
 // Configure initializes the History configuration.
-func (h *History) Configure(curs *cursor.Cursor) *History {
+func (h *History) Configure(flush bool, curs *cursor.Cursor) *History {
 	if h == nil {
 		return nil
 	}
@@ -29,9 +29,9 @@ func (h *History) Configure(curs *cursor.Cursor) *History {
 	}
 	h.valid = false
 	for i := range h.line {
-		_ = h.line[i].Configure(curs)
+		_ = h.line[i].Configure(flush, curs)
 	}
-	h.pend.Configure(curs)
+	h.pend.Configure(flush, curs)
 	return h.init()
 }
 
@@ -42,30 +42,6 @@ func (h *History) init() *History {
 	h.size.Set(1)
 	h.indx.Set(0)
 	return h
-}
-
-func (h *History) Back() {
-	indx, size := h.indx.Get(), h.size.Get()
-	if indx < size-1 {
-		*h.get(int(indx)) = h.pend
-		h.pend.Set(nil)
-		indx++
-		h.pend = *h.get(int(indx))
-		h.pend.Flush()
-		h.indx.Set(indx)
-	}
-}
-
-func (h *History) Forward() {
-	indx := h.indx.Get()
-	if indx > 0 {
-		*h.get(int(indx)) = h.pend
-		h.pend.Set(nil)
-		indx--
-		h.pend = *h.get(int(indx))
-		h.pend.Flush()
-		h.indx.Set(indx)
-	}
 }
 
 func (h *History) Line() *line.Line {

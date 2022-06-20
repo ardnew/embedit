@@ -23,10 +23,11 @@ type Embedit struct {
 
 // Config defines the configuration parameters of an Embedit.
 type Config struct {
-	RW     io.ReadWriter
-	Prompt []rune
-	Width  int
-	Height int
+	RW        io.ReadWriter
+	Prompt    []rune
+	Width     int
+	Height    int
+	AutoFlush bool
 }
 
 // New allocates a new Embedit and returns a pointer to that object.
@@ -37,7 +38,7 @@ func New() Embedit { return Embedit{} }
 // Configure initializes the Embedit configuration.
 func (e *Embedit) Configure(config Config) *Embedit {
 	e.valid = false
-	_ = e.term.Configure(config.RW, config.Prompt, config.Width, config.Height)
+	_ = e.term.Configure(config.RW, config.Prompt, config.Width, config.Height, config.AutoFlush)
 	return e.init()
 }
 

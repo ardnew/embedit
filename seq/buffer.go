@@ -7,8 +7,9 @@ import (
 
 	"github.com/ardnew/embedit/config/limits"
 	"github.com/ardnew/embedit/errors"
+	"github.com/ardnew/embedit/seq/ansi"
 	"github.com/ardnew/embedit/seq/eol"
-	"github.com/ardnew/embedit/seq/key"
+	"github.com/ardnew/embedit/terminal/key"
 	"github.com/ardnew/embedit/util"
 	"github.com/ardnew/embedit/volatile"
 )
@@ -426,9 +427,20 @@ func (buf *Buffer) WriteEOL() (n int, err error) {
 // If successful, it returns the key r and its size n in bytes.
 // Otherwise, it returns key.Error and n=0.
 //
+// Parse does its best to recognize sequences defined by VT10x and xterm line
+// disciplines.
+//
 // Parse consumes the bytes that contribute to the returned key r.
 // If an entire sequence could not be parsed, no bytes are consumed.
 func (buf *Buffer) Parse(isPasting bool) (r rune, n int) {
+	r, n = buf.parse(isPasting)
+	if n > 0 {
+		buf.head.Set(buf.head.Get() + uint32(n))
+	}
+	return
+}
+
+func (buf *Buffer) parse(isPasting bool) (r rune, n int) {
 	h, t := buf.head.Get(), buf.tail.Get()
 	size := t - h // Number of bytes currently in buf.
 	if size == 0 {
@@ -449,52 +461,54 @@ func (buf *Buffer) Parse(isPasting bool) (r rune, n int) {
 	for i := size; i < limits.MaxBytesPerKey; i++ {
 		buf.skey[i] = 0 // Zero out remaining bytes in []skey.
 	}
-	// Be sure to consume the bytes parsed into r.
-	defer func(b *Buffer, head uint32) {
-		if n > 0 {
-			b.head.Set(head + uint32(n))
-		}
-	}(buf, h)
-
 	if !isPasting {
-		// UTF-8 control codes (ASCII)
+		// Single byte translations of ASCII control codes to application-defined
+		// runes that represent control sequences.
 		switch buf.skey[0] {
-		case key.CtrlA:
+		case ansi.CtrlA:
 			return key.Home, 1
-		case key.CtrlB:
+		case ansi.CtrlB:
 			return key.Left, 1
-		case key.CtrlE:
+		case ansi.CtrlC:
+			return key.Interrupt, 1
+		case ansi.CtrlD:
+			return key.EndOfFile, 1
+		case ansi.CtrlE:
 			return key.End, 1
-		case key.CtrlF:
+		case ansi.CtrlF:
 			return key.Right, 1
-		case key.CtrlH:
+		case ansi.CtrlH:
 			return key.Backspace, 1
-		case key.CtrlK:
-			return key.DeleteTrailing, 1
-		case key.CtrlL:
+		case ansi.CtrlK:
+			return key.Kill, 1
+		case ansi.CtrlL:
 			return key.ClearScreen, 1
-		case key.CtrlN:
+		case ansi.CtrlM:
+			return key.Enter, 1
+		case ansi.CtrlN:
 			return key.Down, 1
-		case key.CtrlP:
+		case ansi.CtrlP:
 			return key.Up, 1
-		case key.CtrlU:
-			return key.DeleteLeading, 1
-		case key.CtrlW:
+		case ansi.CtrlU:
+			return key.KillPrevious, 1
+		case ansi.CtrlW:
 			return key.DeleteWord, 1
+		case ansi.Backspace:
+			return key.Backspace, 1
 		}
 	}
 	// UTF-8 runes
-	if buf.skey[0] != key.Escape {
+	if buf.skey[0] != ansi.Escape {
 		if !utf8.FullRune(buf.skey[0:]) {
 			return key.Error, 0
 		}
 		return utf8.DecodeRune(buf.skey[0:])
 	}
 	// ANSI escape sequences
-	if bytes.HasPrefix(buf.skey[0:], key.CSI) {
+	if bytes.HasPrefix(buf.skey[0:], ansi.CSI) {
 		if isPasting {
-			if bytes.HasPrefix(buf.skey[0:], key.EOP) {
-				return key.PasteEnd, len(key.EOP)
+			if bytes.HasPrefix(buf.skey[0:], ansi.EOP) {
+				return key.PasteEnd, len(ansi.EOP)
 			}
 		} else {
 			switch size {
@@ -605,8 +619,8 @@ func (buf *Buffer) Parse(isPasting bool) (r rune, n int) {
 					}
 				}
 			}
-			if bytes.HasPrefix(buf.skey[0:], key.SOP) {
-				return key.PasteStart, len(key.SOP)
+			if bytes.HasPrefix(buf.skey[0:], ansi.SOP) {
+				return key.PasteStart, len(ansi.SOP)
 			}
 		}
 	}
@@ -621,4 +635,12 @@ func (buf *Buffer) Parse(isPasting bool) (r rune, n int) {
 		}
 	}
 	return key.Error, 0
+}
+
+func (buf *Buffer) Last() []byte {
+	n := bytes.IndexByte(buf.skey[:], 0)
+	if n >= 0 {
+		return buf.skey[:n]
+	}
+	return nil
 }

@@ -51,3 +51,31 @@ func (h *History) Add() {
 	// Reset the cursor, data, and I/O buffers.
 	h.pend.LineFeed()
 }
+
+func (h *History) Back() {
+	indx, size := h.indx.Get(), h.size.Get()
+	if indx < size-1 {
+		*h.get(int(indx)) = h.pend
+		h.pend.Set(nil)
+		indx++
+		h.pend = *h.get(int(indx))
+
+		h.pend.Flush()
+		h.pend.MoveCursorTo(h.pend.Position())
+		h.indx.Set(indx)
+	}
+}
+
+func (h *History) Forward() {
+	indx := h.indx.Get()
+	if indx > 0 {
+		*h.get(int(indx)) = h.pend
+		h.pend.Set(nil)
+		indx--
+		h.pend = *h.get(int(indx))
+
+		h.pend.Flush()
+		h.pend.MoveCursorTo(h.pend.Position())
+		h.indx.Set(indx)
+	}
+}
