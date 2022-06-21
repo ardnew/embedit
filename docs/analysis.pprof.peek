@@ -1,58 +1,54 @@
 File: analysis.pprof
 n = 10000, t = 0
 Type: alloc_space
-Time: Jun 21, 2022 at 11:28am (CDT)
-Showing nodes accounting for 8.12kB, 100% of 8.12kB total
+Time: Jun 21, 2022 at 12:34pm (CDT)
+Showing nodes accounting for 8.11kB, 100% of 8.11kB total
 ----------------------------------------------------------+-------------
       flat  flat%   sum%        cum   cum%   calls calls% + context 	 	 
 ----------------------------------------------------------+-------------
                                             3.66kB 81.82% |   runtime.newproc1 runtime/proc.go
                                             0.41kB  9.09% |   runtime.allocm runtime/proc.go
                                             0.41kB  9.09% |   runtime.mpreinit runtime/os_darwin.go
-    4.47kB 55.00% 55.00%     4.47kB 55.00%                | runtime.malg runtime/proc.go
+    4.47kB 55.11% 55.11%     4.47kB 55.11%                | runtime.malg runtime/proc.go
 ----------------------------------------------------------+-------------
                                             3.06kB   100% |   runtime.newm runtime/proc.go
-    2.25kB 27.69% 82.69%     3.06kB 37.69%                | runtime.allocm runtime/proc.go
+    2.25kB 27.75% 82.85%     3.06kB 37.76%                | runtime.allocm runtime/proc.go
                                             0.41kB 13.27% |   runtime.malg runtime/proc.go
                                             0.41kB 13.27% |   runtime.mcommoninit runtime/proc.go
 ----------------------------------------------------------+-------------
-                                            0.33kB 72.41% |   flag.(*FlagSet).IntVar flag/flag.go
-                                            0.06kB 13.79% |   flag.(*FlagSet).DurationVar flag/flag.go
-                                            0.06kB 13.79% |   flag.(*FlagSet).StringVar flag/flag.go
-    0.44kB  5.38% 88.08%     0.45kB  5.58%                | flag.(*FlagSet).Var flag/flag.go
-                                            0.02kB  3.45% |   flag.(*intValue).String flag/flag.go
+                                            0.31kB 71.43% |   flag.(*FlagSet).IntVar flag/flag.go
+                                            0.06kB 14.29% |   flag.(*FlagSet).DurationVar flag/flag.go
+                                            0.06kB 14.29% |   flag.(*FlagSet).StringVar flag/flag.go
+    0.44kB  5.39% 88.25%     0.44kB  5.39%                | flag.(*FlagSet).Var flag/flag.go
 ----------------------------------------------------------+-------------
                                             0.25kB   100% |   flag.(*FlagSet).Parse flag/flag.go
-    0.25kB  3.08% 91.15%     0.25kB  3.08%                | flag.(*FlagSet).parseOne flag/flag.go
+    0.25kB  3.08% 91.33%     0.25kB  3.08%                | flag.(*FlagSet).parseOne flag/flag.go
 ----------------------------------------------------------+-------------
-    0.25kB  3.08% 94.23%     0.34kB  4.23%                | runtime.gcBgMarkWorker runtime/mgc.go
+    0.25kB  3.08% 94.41%     0.34kB  4.24%                | runtime.gcBgMarkWorker runtime/mgc.go
                                             0.09kB 27.27% |   runtime.gcMarkDone runtime/mgc.go
 ----------------------------------------------------------+-------------
                                             0.12kB   100% |   runtime.newproc1 runtime/proc.go
-    0.12kB  1.54% 95.77%     0.12kB  1.54%                | runtime.allgadd runtime/proc.go
+    0.12kB  1.54% 95.95%     0.12kB  1.54%                | runtime.allgadd runtime/proc.go
 ----------------------------------------------------------+-------------
                                             0.11kB   100% |   main.parseFlags embedit/examples/analysis/run_pprof.go
-    0.11kB  1.35% 97.12%     0.11kB  1.35%                | flag.NewFlagSet flag/flag.go
+    0.11kB  1.35% 97.30%     0.11kB  1.35%                | flag.NewFlagSet flag/flag.go
 ----------------------------------------------------------+-------------
                                             0.10kB   100% |   os.openFileNolog os/file_unix.go
-    0.10kB  1.25% 98.37%     0.10kB  1.25%                | os.newFile os/file_unix.go
+    0.10kB  1.25% 98.55%     0.10kB  1.25%                | os.newFile os/file_unix.go
 ----------------------------------------------------------+-------------
                                             0.09kB   100% |   runtime.semacquire1 runtime/sema.go
-    0.09kB  1.15% 99.52%     0.09kB  1.15%                | runtime.acquireSudog runtime/proc.go
+    0.09kB  1.16% 99.71%     0.09kB  1.16%                | runtime.acquireSudog runtime/proc.go
 ----------------------------------------------------------+-------------
                                             0.02kB   100% |   syscall.BytePtrFromString syscall/syscall.go
-    0.02kB  0.29% 99.81%     0.02kB  0.29%                | syscall.ByteSliceFromString syscall/syscall.go
-----------------------------------------------------------+-------------
-                                            0.02kB   100% |   strconv.FormatInt strconv/itoa.go
-    0.02kB  0.19%   100%     0.02kB  0.19%                | strconv.formatBits strconv/itoa.go
+    0.02kB  0.29%   100%     0.02kB  0.29%                | syscall.ByteSliceFromString syscall/syscall.go
 ----------------------------------------------------------+-------------
                                             0.06kB   100% |   main.parseFlags embedit/examples/analysis/run_pprof.go
          0     0%   100%     0.06kB  0.77%                | flag.(*FlagSet).DurationVar flag/flag.go
                                             0.06kB   100% |   flag.(*FlagSet).Var flag/flag.go
 ----------------------------------------------------------+-------------
-                                            0.33kB   100% |   main.parseFlags embedit/examples/analysis/run_pprof.go
-         0     0%   100%     0.33kB  4.04%                | flag.(*FlagSet).IntVar flag/flag.go
-                                            0.33kB   100% |   flag.(*FlagSet).Var flag/flag.go
+                                            0.31kB   100% |   main.parseFlags embedit/examples/analysis/run_pprof.go
+         0     0%   100%     0.31kB  3.85%                | flag.(*FlagSet).IntVar flag/flag.go
+                                            0.31kB   100% |   flag.(*FlagSet).Var flag/flag.go
 ----------------------------------------------------------+-------------
                                             0.25kB   100% |   main.parseFlags embedit/examples/analysis/run_pprof.go
          0     0%   100%     0.25kB  3.08%                | flag.(*FlagSet).Parse flag/flag.go
@@ -62,26 +58,22 @@ Showing nodes accounting for 8.12kB, 100% of 8.12kB total
          0     0%   100%     0.06kB  0.77%                | flag.(*FlagSet).StringVar flag/flag.go
                                             0.06kB   100% |   flag.(*FlagSet).Var flag/flag.go
 ----------------------------------------------------------+-------------
-                                            0.02kB   100% |   flag.(*FlagSet).Var flag/flag.go
-         0     0%   100%     0.02kB  0.19%                | flag.(*intValue).String flag/flag.go
-                                            0.02kB   100% |   strconv.Itoa strconv/itoa.go (inline)
+                                            0.92kB   100% |   runtime.main runtime/proc.go
+         0     0%   100%     0.92kB 11.37%                | main.main embedit/examples/analysis/main.go
+                                            0.92kB   100% |   main.run embedit/examples/analysis/run_pprof.go
 ----------------------------------------------------------+-------------
-                                            0.94kB   100% |   runtime.main runtime/proc.go
-         0     0%   100%     0.94kB 11.54%                | main.main embedit/examples/analysis/main.go
-                                            0.94kB   100% |   main.run embedit/examples/analysis/run_pprof.go
+                                            0.80kB   100% |   main.run embedit/examples/analysis/run_pprof.go
+         0     0%   100%     0.80kB  9.83%                | main.parseFlags embedit/examples/analysis/run_pprof.go
+                                            0.31kB 39.22% |   flag.(*FlagSet).IntVar flag/flag.go
+                                            0.25kB 31.37% |   flag.(*FlagSet).Parse flag/flag.go
+                                            0.11kB 13.73% |   flag.NewFlagSet flag/flag.go
+                                            0.06kB  7.84% |   flag.(*FlagSet).DurationVar flag/flag.go
+                                            0.06kB  7.84% |   flag.(*FlagSet).StringVar flag/flag.go
 ----------------------------------------------------------+-------------
-                                            0.81kB   100% |   main.run embedit/examples/analysis/run_pprof.go
-         0     0%   100%     0.81kB 10.00%                | main.parseFlags embedit/examples/analysis/run_pprof.go
-                                            0.33kB 40.38% |   flag.(*FlagSet).IntVar flag/flag.go
-                                            0.25kB 30.77% |   flag.(*FlagSet).Parse flag/flag.go
-                                            0.11kB 13.46% |   flag.NewFlagSet flag/flag.go
-                                            0.06kB  7.69% |   flag.(*FlagSet).DurationVar flag/flag.go
-                                            0.06kB  7.69% |   flag.(*FlagSet).StringVar flag/flag.go
-----------------------------------------------------------+-------------
-                                            0.94kB   100% |   main.main embedit/examples/analysis/main.go
-         0     0%   100%     0.94kB 11.54%                | main.run embedit/examples/analysis/run_pprof.go
-                                            0.81kB 86.67% |   main.parseFlags embedit/examples/analysis/run_pprof.go
-                                            0.12kB 13.33% |   os.Create os/file.go
+                                            0.92kB   100% |   main.main embedit/examples/analysis/main.go
+         0     0%   100%     0.92kB 11.37%                | main.run embedit/examples/analysis/run_pprof.go
+                                            0.80kB 86.44% |   main.parseFlags embedit/examples/analysis/run_pprof.go
+                                            0.12kB 13.56% |   os.Create os/file.go
 ----------------------------------------------------------+-------------
                                             0.12kB   100% |   main.run embedit/examples/analysis/run_pprof.go
          0     0%   100%     0.12kB  1.54%                | os.Create os/file.go
@@ -97,86 +89,78 @@ Showing nodes accounting for 8.12kB, 100% of 8.12kB total
                                             0.02kB 18.75% |   syscall.Open syscall/zsyscall_darwin_amd64.go
 ----------------------------------------------------------+-------------
                                             0.09kB   100% |   runtime.gcBgMarkWorker runtime/mgc.go
-         0     0%   100%     0.09kB  1.15%                | runtime.gcMarkDone runtime/mgc.go
+         0     0%   100%     0.09kB  1.16%                | runtime.gcMarkDone runtime/mgc.go
                                             0.09kB   100% |   runtime.semacquire runtime/sema.go (inline)
 ----------------------------------------------------------+-------------
-         0     0%   100%     0.94kB 11.54%                | runtime.main runtime/proc.go
-                                            0.94kB   100% |   main.main embedit/examples/analysis/main.go
+         0     0%   100%     0.92kB 11.37%                | runtime.main runtime/proc.go
+                                            0.92kB   100% |   main.main embedit/examples/analysis/main.go
 ----------------------------------------------------------+-------------
-         0     0%   100%     1.94kB 23.85%                | runtime.mcall runtime/asm_amd64.s
+         0     0%   100%     1.94kB 23.89%                | runtime.mcall runtime/asm_amd64.s
                                             1.94kB   100% |   runtime.park_m runtime/proc.go
 ----------------------------------------------------------+-------------
                                             0.41kB   100% |   runtime.allocm runtime/proc.go
-         0     0%   100%     0.41kB  5.00%                | runtime.mcommoninit runtime/proc.go
+         0     0%   100%     0.41kB  5.01%                | runtime.mcommoninit runtime/proc.go
                                             0.41kB   100% |   runtime.mpreinit runtime/os_darwin.go
 ----------------------------------------------------------+-------------
                                             0.41kB   100% |   runtime.mcommoninit runtime/proc.go
-         0     0%   100%     0.41kB  5.00%                | runtime.mpreinit runtime/os_darwin.go
+         0     0%   100%     0.41kB  5.01%                | runtime.mpreinit runtime/os_darwin.go
                                             0.41kB   100% |   runtime.malg runtime/proc.go
 ----------------------------------------------------------+-------------
-         0     0%   100%     1.12kB 13.85%                | runtime.mstart runtime/asm_amd64.s
+         0     0%   100%     1.12kB 13.87%                | runtime.mstart runtime/asm_amd64.s
                                             1.12kB   100% |   runtime.mstart0 runtime/proc.go
 ----------------------------------------------------------+-------------
                                             1.12kB   100% |   runtime.mstart runtime/asm_amd64.s
-         0     0%   100%     1.12kB 13.85%                | runtime.mstart0 runtime/proc.go
+         0     0%   100%     1.12kB 13.87%                | runtime.mstart0 runtime/proc.go
                                             1.12kB   100% |   runtime.mstart1 runtime/proc.go
 ----------------------------------------------------------+-------------
                                             1.12kB   100% |   runtime.mstart0 runtime/proc.go
-         0     0%   100%     1.12kB 13.85%                | runtime.mstart1 runtime/proc.go
+         0     0%   100%     1.12kB 13.87%                | runtime.mstart1 runtime/proc.go
                                             1.12kB   100% |   runtime.schedule runtime/proc.go
 ----------------------------------------------------------+-------------
                                             3.06kB   100% |   runtime.startm runtime/proc.go
-         0     0%   100%     3.06kB 37.69%                | runtime.newm runtime/proc.go
+         0     0%   100%     3.06kB 37.76%                | runtime.newm runtime/proc.go
                                             3.06kB   100% |   runtime.allocm runtime/proc.go
 ----------------------------------------------------------+-------------
                                             3.78kB   100% |   runtime.systemstack runtime/asm_amd64.s
-         0     0%   100%     3.78kB 46.54%                | runtime.newproc.func1 runtime/proc.go
+         0     0%   100%     3.78kB 46.63%                | runtime.newproc.func1 runtime/proc.go
                                             3.78kB   100% |   runtime.newproc1 runtime/proc.go
 ----------------------------------------------------------+-------------
                                             3.78kB   100% |   runtime.newproc.func1 runtime/proc.go
-         0     0%   100%     3.78kB 46.54%                | runtime.newproc1 runtime/proc.go
+         0     0%   100%     3.78kB 46.63%                | runtime.newproc1 runtime/proc.go
                                             3.66kB 96.69% |   runtime.malg runtime/proc.go
                                             0.12kB  3.31% |   runtime.allgadd runtime/proc.go
 ----------------------------------------------------------+-------------
                                             1.94kB   100% |   runtime.mcall runtime/asm_amd64.s
-         0     0%   100%     1.94kB 23.85%                | runtime.park_m runtime/proc.go
+         0     0%   100%     1.94kB 23.89%                | runtime.park_m runtime/proc.go
                                             1.94kB   100% |   runtime.schedule runtime/proc.go
 ----------------------------------------------------------+-------------
                                             3.06kB   100% |   runtime.schedule runtime/proc.go
-         0     0%   100%     3.06kB 37.69%                | runtime.resetspinning runtime/proc.go
+         0     0%   100%     3.06kB 37.76%                | runtime.resetspinning runtime/proc.go
                                             3.06kB   100% |   runtime.wakep runtime/proc.go
 ----------------------------------------------------------+-------------
                                             1.94kB 63.27% |   runtime.park_m runtime/proc.go
                                             1.12kB 36.73% |   runtime.mstart1 runtime/proc.go
-         0     0%   100%     3.06kB 37.69%                | runtime.schedule runtime/proc.go
+         0     0%   100%     3.06kB 37.76%                | runtime.schedule runtime/proc.go
                                             3.06kB   100% |   runtime.resetspinning runtime/proc.go
 ----------------------------------------------------------+-------------
                                             0.09kB   100% |   runtime.gcMarkDone runtime/mgc.go (inline)
-         0     0%   100%     0.09kB  1.15%                | runtime.semacquire runtime/sema.go
+         0     0%   100%     0.09kB  1.16%                | runtime.semacquire runtime/sema.go
                                             0.09kB   100% |   runtime.semacquire1 runtime/sema.go
 ----------------------------------------------------------+-------------
                                             0.09kB   100% |   runtime.semacquire runtime/sema.go
-         0     0%   100%     0.09kB  1.15%                | runtime.semacquire1 runtime/sema.go
+         0     0%   100%     0.09kB  1.16%                | runtime.semacquire1 runtime/sema.go
                                             0.09kB   100% |   runtime.acquireSudog runtime/proc.go
 ----------------------------------------------------------+-------------
                                             3.06kB   100% |   runtime.wakep runtime/proc.go
-         0     0%   100%     3.06kB 37.69%                | runtime.startm runtime/proc.go
+         0     0%   100%     3.06kB 37.76%                | runtime.startm runtime/proc.go
                                             3.06kB   100% |   runtime.newm runtime/proc.go
 ----------------------------------------------------------+-------------
-         0     0%   100%     3.78kB 46.54%                | runtime.systemstack runtime/asm_amd64.s
+         0     0%   100%     3.78kB 46.63%                | runtime.systemstack runtime/asm_amd64.s
                                             3.78kB   100% |   runtime.newproc.func1 runtime/proc.go
 ----------------------------------------------------------+-------------
                                             3.06kB   100% |   runtime.resetspinning runtime/proc.go
-         0     0%   100%     3.06kB 37.69%                | runtime.wakep runtime/proc.go
+         0     0%   100%     3.06kB 37.76%                | runtime.wakep runtime/proc.go
                                             3.06kB   100% |   runtime.startm runtime/proc.go
-----------------------------------------------------------+-------------
-                                            0.02kB   100% |   strconv.Itoa strconv/itoa.go
-         0     0%   100%     0.02kB  0.19%                | strconv.FormatInt strconv/itoa.go
-                                            0.02kB   100% |   strconv.formatBits strconv/itoa.go
-----------------------------------------------------------+-------------
-                                            0.02kB   100% |   flag.(*intValue).String flag/flag.go (inline)
-         0     0%   100%     0.02kB  0.19%                | strconv.Itoa strconv/itoa.go
-                                            0.02kB   100% |   strconv.FormatInt strconv/itoa.go
 ----------------------------------------------------------+-------------
                                             0.02kB   100% |   syscall.Open syscall/zsyscall_darwin_amd64.go (inline)
          0     0%   100%     0.02kB  0.29%                | syscall.BytePtrFromString syscall/syscall.go

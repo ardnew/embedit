@@ -54,9 +54,6 @@ terminal/display/display.go:98:7: leaking param: d to result ~r0 level=1
 terminal/display/display.go:117:7: leaking param: d to result ~r0 level=0
 terminal/display/display.go:126:7: leaking param content: d
 terminal/display/display.go:148:7: d does not escape
-# github.com/ardnew/embedit/util
-util/io.go:15:7: leaking param: i
-util/io.go:15:23: leaking param: p
 # github.com/ardnew/embedit/terminal/wire
 terminal/wire/wire.go:42:7: leaking param: c to result ~r0 level=0
 terminal/wire/wire.go:42:29: leaking param: ctrl
@@ -64,6 +61,9 @@ terminal/wire/wire.go:42:46: leaking param: in
 terminal/wire/wire.go:42:57: leaking param: out
 terminal/wire/wire.go:52:7: leaking param content: c
 terminal/wire/wire.go:52:7: leaking param: c to result ~r0 level=0
+# github.com/ardnew/embedit/util
+util/io.go:15:7: leaking param: i
+util/io.go:15:23: leaking param: p
 # github.com/ardnew/embedit/seq/ascii
 seq/ascii/uint.go:16:7: leaking param: p
 seq/ascii/uint.go:16:26: leaking param: w
@@ -87,6 +87,35 @@ terminal/cursor/cursor.go:107:7: c does not escape
 terminal/cursor/cursor.go:131:7: leaking param: c
 terminal/cursor/cursor.go:192:7: leaking param: c
 terminal/cursor/cursor.go:192:27: buf does not escape
+# github.com/ardnew/embedit/seq
+seq/buffer.go:64:7: leaking param: buf to result ~r0 level=0
+seq/buffer.go:43:7: leaking param: buf to result ~r0 level=0
+seq/buffer.go:28:7: leaking param: buf to result ~r0 level=0
+seq/buffer.go:49:7: buf does not escape
+seq/buffer.go:57:7: buf does not escape
+seq/buffer.go:71:7: buf does not escape
+seq/buffer.go:80:7: buf does not escape
+seq/buffer.go:80:25: p does not escape
+seq/buffer.go:110:7: buf does not escape
+seq/buffer.go:110:26: p does not escape
+seq/buffer.go:144:7: leaking param: buf
+seq/buffer.go:144:29: leaking param: r
+seq/buffer.go:174:7: leaking param: buf
+seq/buffer.go:174:29: leaking param: r
+seq/buffer.go:247:7: leaking param: buf
+seq/buffer.go:247:28: leaking param: w
+seq/buffer.go:316:7: leaking param: buf
+seq/buffer.go:316:28: leaking param: w
+seq/buffer.go:373:7: buf does not escape
+seq/buffer.go:393:7: buf does not escape
+seq/buffer.go:421:7: leaking param: buf
+seq/buffer.go:443:7: buf does not escape
+seq/buffer.go:435:7: buf does not escape
+seq/buffer.go:640:7: leaking param: buf to result ~r0 level=0
+seq/buffer.go:94:18: index bounds check elided
+seq/buffer.go:132:12: index bounds check elided
+seq/buffer.go:388:17: index bounds check elided
+seq/buffer.go:459:25: index bounds check elided
 # github.com/ardnew/embedit/terminal/line
 terminal/line/line.go:61:7: leaking param content: l
 terminal/line/line.go:61:7: leaking param: l to result ~r0 level=0
@@ -124,35 +153,6 @@ terminal/line/line.go:395:20: s does not escape
 terminal/line/line.go:445:7: leaking param: l
 terminal/line/line.go:563:7: l does not escape
 terminal/line/line.go:563:22: leaking param: p
-# github.com/ardnew/embedit/seq
-seq/buffer.go:64:7: leaking param: buf to result ~r0 level=0
-seq/buffer.go:43:7: leaking param: buf to result ~r0 level=0
-seq/buffer.go:28:7: leaking param: buf to result ~r0 level=0
-seq/buffer.go:49:7: buf does not escape
-seq/buffer.go:57:7: buf does not escape
-seq/buffer.go:71:7: buf does not escape
-seq/buffer.go:80:7: buf does not escape
-seq/buffer.go:80:25: p does not escape
-seq/buffer.go:110:7: buf does not escape
-seq/buffer.go:110:26: p does not escape
-seq/buffer.go:144:7: leaking param: buf
-seq/buffer.go:144:29: leaking param: r
-seq/buffer.go:174:7: leaking param: buf
-seq/buffer.go:174:29: leaking param: r
-seq/buffer.go:247:7: leaking param: buf
-seq/buffer.go:247:28: leaking param: w
-seq/buffer.go:316:7: leaking param: buf
-seq/buffer.go:316:28: leaking param: w
-seq/buffer.go:373:7: buf does not escape
-seq/buffer.go:393:7: buf does not escape
-seq/buffer.go:421:7: leaking param: buf
-seq/buffer.go:443:7: buf does not escape
-seq/buffer.go:435:7: buf does not escape
-seq/buffer.go:640:7: leaking param: buf to result ~r0 level=0
-seq/buffer.go:94:18: index bounds check elided
-seq/buffer.go:132:12: index bounds check elided
-seq/buffer.go:388:17: index bounds check elided
-seq/buffer.go:459:25: index bounds check elided
 # github.com/ardnew/embedit/terminal/history
 terminal/history/buffer.go:12:7: h does not escape
 terminal/history/buffer.go:20:7: leaking param: h to result ~r0 level=0
@@ -175,6 +175,8 @@ terminal/terminal.go:79:7: leaking param: t to result ~r0 level=0
 terminal/terminal.go:129:7: leaking param: t
 terminal/terminal.go:119:7: leaking param: t
 terminal/terminal.go:83:7: leaking param: t
+# github.com/ardnew/embedit/sys/unix
+sys/unix/termios.go:36:19: value does not escape
 # github.com/ardnew/embedit
 ./embedit.go:46:7: leaking param: e to result ~r0 level=0
 ./embedit.go:39:7: leaking param: e
@@ -182,8 +184,6 @@ terminal/terminal.go:83:7: leaking param: t
 ./embedit.go:52:7: leaking param: e to result ~r0 level=0
 ./embedit.go:59:7: leaking param: e to result ~r0 level=0
 ./embedit.go:67:7: leaking param: e to result ~r0 level=0
-# github.com/ardnew/embedit/sys/unix
-sys/unix/termios.go:36:19: value does not escape
 # github.com/ardnew/embedit/sys
 sys/sys_unix.go:20:7: f does not escape
 sys/sys.go:17:7: f does not escape
@@ -195,9 +195,9 @@ sys/sys.go:39:7: f does not escape
 sys/sys_unix.go:41:7: f does not escape
 sys/sys.go:45:7: f does not escape
 # github.com/ardnew/embedit/examples/analysis
-examples/analysis/run_pprof.go:23:10: fn does not escape
-examples/analysis/run_pprof.go:34:8: func literal does not escape
-examples/analysis/main.go:79:38: []rune{...} does not escape
-examples/analysis/main.go:81:38: []rune{...} does not escape
-examples/analysis/main.go:83:38: []rune{...} does not escape
-examples/analysis/main.go:106:23: []rune{...} does not escape
+../examples/analysis/run_pprof.go:23:10: fn does not escape
+../examples/analysis/run_pprof.go:34:8: func literal does not escape
+../examples/analysis/main.go:79:38: []rune{...} does not escape
+../examples/analysis/main.go:81:38: []rune{...} does not escape
+../examples/analysis/main.go:83:38: []rune{...} does not escape
+../examples/analysis/main.go:106:23: []rune{...} does not escape

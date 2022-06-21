@@ -32,6 +32,6 @@ So far, runtime heap allocation can only be eliminated from the package code and
 
 The following graph shows the total heap memory allocated throughout the lifetime of the program. 
 
-![Heap profile (examples/analysis)](docs/analysis.pprof.svg)
+![Heap profile (examples/analysis)](docs/analysis.pprof.png)
 
 As you can see, most of the memory is attributed to the internal runtime constructs mentioned above. All remaining allocations are related to the main package of the `analysis` example such as the profiler tooling and command-line flag parser. None of these are directly related to the `embedit` package itself.

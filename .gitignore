@@ -4,8 +4,6 @@
 /*.bin
 /*.png
 /.vscode/build
-*.profile
-*.trace
 go.sum
 /analysis
 /basic

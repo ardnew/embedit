@@ -11,3 +11,4 @@ go build -o=./analysis.pprof -tags=pprof,history -gcflags='github.com/ardnew/emb
 go tool pprof -alloc_space -add_comment="n = 10000, t = 0" -filefunctions -nodefraction=0 -edgefraction=0 -source_path=/usr/local/go/dev/src:.. -output=analysis.pprof.tree -tree analysis.pprof analysis.pprof.profile
 go tool pprof -alloc_space -add_comment="n = 10000, t = 0" -filefunctions -nodefraction=0 -edgefraction=0 -source_path=/usr/local/go/dev/src:.. -output=analysis.pprof.peek -peek=. analysis.pprof analysis.pprof.profile
 go tool pprof -alloc_space -add_comment="n = 10000, t = 0" -filefunctions -nodefraction=0 -edgefraction=0 -source_path=/usr/local/go/dev/src:.. -output=analysis.pprof.svg -svg analysis.pprof analysis.pprof.profile
+go tool pprof -alloc_space -add_comment="n = 10000, t = 0" -filefunctions -nodefraction=0 -edgefraction=0 -source_path=/usr/local/go/dev/src:.. -output=analysis.pprof.png -png analysis.pprof analysis.pprof.profile
