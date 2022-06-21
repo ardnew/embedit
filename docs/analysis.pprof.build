@@ -1,0 +1,203 @@
+# github.com/ardnew/embedit/errors
+errors/errors.go:31:7: e does not escape
+errors/errors.go:35:7: e does not escape
+errors/errors.go:39:7: e does not escape
+errors/errors.go:43:7: e does not escape
+errors/errors.go:47:7: e does not escape
+errors/errors.go:51:7: e does not escape
+# github.com/ardnew/embedit/volatile
+volatile/volatile.go:10:7: r does not escape
+volatile/volatile.go:15:7: r does not escape
+volatile/volatile.go:23:7: r does not escape
+volatile/volatile.go:28:7: r does not escape
+# github.com/ardnew/embedit/seq/utf8
+seq/utf8/iterator.go:30:7: ir does not escape
+seq/utf8/iterator.go:34:7: ir does not escape
+seq/utf8/iterator.go:38:7: leaking param: ir to result ~r0 level=1
+seq/utf8/iterator.go:52:7: leaking param content: s
+seq/utf8/iterator.go:52:7: leaking param: s to result ~r0 level=0
+seq/utf8/iterator.go:70:7: leaking param content: s
+seq/utf8/iterator.go:70:7: leaking param: s to result ~r0 level=0
+seq/utf8/iterator.go:96:7: leaking param content: s
+seq/utf8/rune.go:47:7: r does not escape
+seq/utf8/iterator.go:111:7: leaking param content: s
+seq/utf8/iterator.go:116:13: p does not escape
+seq/utf8/iterator.go:116:8: func literal does not escape
+seq/utf8/iterator.go:151:7: leaking param content: s
+seq/utf8/iterator.go:153:13: p does not escape
+seq/utf8/iterator.go:153:8: func literal does not escape
+seq/utf8/rune.go:22:7: r does not escape
+seq/utf8/rune.go:30:7: r does not escape
+seq/utf8/rune.go:38:7: r does not escape
+seq/utf8/rune.go:63:7: r does not escape
+seq/utf8/rune.go:58:7: r does not escape
+seq/utf8/rune.go:71:7: r does not escape
+seq/utf8/rune.go:78:7: r does not escape
+seq/utf8/rune.go:78:23: p does not escape
+seq/utf8/rune.go:93:7: r does not escape
+seq/utf8/rune.go:93:21: p does not escape
+seq/utf8/rune.go:100:15: p does not escape
+# github.com/ardnew/embedit/terminal/display
+terminal/display/display.go:68:7: d does not escape
+terminal/display/display.go:109:7: leaking param: d to result ~r0 level=0
+terminal/display/display.go:134:7: leaking param: d
+terminal/display/display.go:134:29: leaking param: prompt
+terminal/display/display.go:87:7: d does not escape
+terminal/display/display.go:38:7: leaking param: d to result ~r0 level=0
+terminal/display/display.go:21:7: leaking param: d
+terminal/display/display.go:21:48: leaking param: prompt
+terminal/display/display.go:44:7: d does not escape
+terminal/display/display.go:52:7: d does not escape
+terminal/display/display.go:60:7: d does not escape
+terminal/display/display.go:82:7: d does not escape
+terminal/display/display.go:98:7: leaking param: d to result ~r0 level=1
+terminal/display/display.go:117:7: leaking param: d to result ~r0 level=0
+terminal/display/display.go:126:7: leaking param content: d
+terminal/display/display.go:148:7: d does not escape
+# github.com/ardnew/embedit/util
+util/io.go:15:7: leaking param: i
+util/io.go:15:23: leaking param: p
+# github.com/ardnew/embedit/terminal/wire
+terminal/wire/wire.go:42:7: leaking param: c to result ~r0 level=0
+terminal/wire/wire.go:42:29: leaking param: ctrl
+terminal/wire/wire.go:42:46: leaking param: in
+terminal/wire/wire.go:42:57: leaking param: out
+terminal/wire/wire.go:52:7: leaking param content: c
+terminal/wire/wire.go:52:7: leaking param: c to result ~r0 level=0
+# github.com/ardnew/embedit/seq/ascii
+seq/ascii/uint.go:16:7: leaking param: p
+seq/ascii/uint.go:16:26: leaking param: w
+# github.com/ardnew/embedit/seq/eol
+seq/eol/eol.go:30:23: leaking param: w
+# github.com/ardnew/embedit/terminal/cursor
+terminal/cursor/cursor.go:78:7: c does not escape
+terminal/cursor/cursor.go:38:7: leaking param: c to result ~r0 level=0
+terminal/cursor/cursor.go:32:7: leaking param: c to result ~r0 level=0
+terminal/cursor/cursor.go:23:7: leaking param: c to result ~r0 level=0
+terminal/cursor/cursor.go:23:40: leaking param: ctrl
+terminal/cursor/cursor.go:23:60: leaking param: disp
+terminal/cursor/cursor.go:46:7: leaking param content: c
+terminal/cursor/cursor.go:53:7: c does not escape
+terminal/cursor/cursor.go:62:7: leaking param: c to result ~r0 level=1
+terminal/cursor/cursor.go:63:7: leaking param: c to result ~r0 level=1
+terminal/cursor/cursor.go:66:7: c does not escape
+terminal/cursor/cursor.go:69:7: c does not escape
+terminal/cursor/cursor.go:72:7: c does not escape
+terminal/cursor/cursor.go:107:7: c does not escape
+terminal/cursor/cursor.go:131:7: leaking param: c
+terminal/cursor/cursor.go:192:7: leaking param: c
+terminal/cursor/cursor.go:192:27: buf does not escape
+# github.com/ardnew/embedit/terminal/line
+terminal/line/line.go:61:7: leaking param content: l
+terminal/line/line.go:61:7: leaking param: l to result ~r0 level=0
+terminal/line/line.go:49:7: leaking param content: l
+terminal/line/line.go:49:7: leaking param: l to result ~r0 level=0
+terminal/line/line.go:32:7: leaking param: l
+terminal/line/line.go:32:38: leaking param: curs
+terminal/line/line.go:75:7: leaking param content: l
+terminal/line/line.go:82:7: l does not escape
+terminal/line/line.go:92:7: l does not escape
+terminal/line/line.go:106:7: l does not escape
+terminal/line/line.go:110:7: l does not escape
+terminal/line/line.go:113:7: l does not escape
+terminal/line/line.go:116:7: l does not escape
+terminal/line/line.go:119:7: leaking param: l to result ~r0 level=0
+terminal/line/line.go:122:7: l does not escape
+terminal/line/line.go:335:7: l does not escape
+terminal/line/line.go:131:7: l does not escape
+terminal/line/line.go:166:7: l does not escape
+terminal/line/line.go:190:7: l does not escape
+terminal/line/line.go:318:7: leaking param content: l
+terminal/line/line.go:471:7: leaking param: l
+terminal/line/line.go:339:7: l does not escape
+terminal/line/line.go:354:7: leaking param content: l
+terminal/line/line.go:383:7: leaking param content: l
+terminal/line/line.go:205:7: leaking param: l
+terminal/line/line.go:244:7: leaking param: l
+terminal/line/line.go:294:7: leaking param content: l
+terminal/line/line.go:327:7: leaking param content: l
+terminal/line/line.go:390:7: leaking param content: l
+terminal/line/line.go:402:7: leaking param: l
+terminal/line/line.go:402:35: s does not escape
+terminal/line/line.go:395:7: leaking param: l
+terminal/line/line.go:395:20: s does not escape
+terminal/line/line.go:445:7: leaking param: l
+terminal/line/line.go:563:7: l does not escape
+terminal/line/line.go:563:22: leaking param: p
+# github.com/ardnew/embedit/seq
+seq/buffer.go:64:7: leaking param: buf to result ~r0 level=0
+seq/buffer.go:43:7: leaking param: buf to result ~r0 level=0
+seq/buffer.go:28:7: leaking param: buf to result ~r0 level=0
+seq/buffer.go:49:7: buf does not escape
+seq/buffer.go:57:7: buf does not escape
+seq/buffer.go:71:7: buf does not escape
+seq/buffer.go:80:7: buf does not escape
+seq/buffer.go:80:25: p does not escape
+seq/buffer.go:110:7: buf does not escape
+seq/buffer.go:110:26: p does not escape
+seq/buffer.go:144:7: leaking param: buf
+seq/buffer.go:144:29: leaking param: r
+seq/buffer.go:174:7: leaking param: buf
+seq/buffer.go:174:29: leaking param: r
+seq/buffer.go:247:7: leaking param: buf
+seq/buffer.go:247:28: leaking param: w
+seq/buffer.go:316:7: leaking param: buf
+seq/buffer.go:316:28: leaking param: w
+seq/buffer.go:373:7: buf does not escape
+seq/buffer.go:393:7: buf does not escape
+seq/buffer.go:421:7: leaking param: buf
+seq/buffer.go:443:7: buf does not escape
+seq/buffer.go:435:7: buf does not escape
+seq/buffer.go:640:7: leaking param: buf to result ~r0 level=0
+seq/buffer.go:94:18: index bounds check elided
+seq/buffer.go:132:12: index bounds check elided
+seq/buffer.go:388:17: index bounds check elided
+seq/buffer.go:459:25: index bounds check elided
+# github.com/ardnew/embedit/terminal/history
+terminal/history/buffer.go:12:7: h does not escape
+terminal/history/buffer.go:20:7: leaking param: h to result ~r0 level=0
+terminal/history/buffer.go:33:7: leaking param content: h
+terminal/history/buffer.go:55:7: leaking param: h
+terminal/history/buffer.go:69:7: leaking param: h
+terminal/history/history.go:39:7: leaking param: h to result ~r0 level=0
+terminal/history/history.go:21:7: leaking param: h
+terminal/history/history.go:21:41: leaking param: curs
+terminal/history/history.go:47:7: leaking param: h to result ~r0 level=0
+# github.com/ardnew/embedit/terminal
+terminal/terminal.go:57:7: leaking param: t to result ~r0 level=0
+terminal/terminal.go:39:7: leaking param: t
+terminal/terminal.go:40:2: leaking param: rw
+terminal/terminal.go:40:20: leaking param: prompt
+terminal/terminal.go:64:7: leaking param: t
+terminal/terminal.go:70:7: leaking param: t
+terminal/terminal.go:75:7: leaking param: t to result ~r0 level=0
+terminal/terminal.go:79:7: leaking param: t to result ~r0 level=0
+terminal/terminal.go:129:7: leaking param: t
+terminal/terminal.go:119:7: leaking param: t
+terminal/terminal.go:83:7: leaking param: t
+# github.com/ardnew/embedit
+./embedit.go:46:7: leaking param: e to result ~r0 level=0
+./embedit.go:39:7: leaking param: e
+./embedit.go:39:29: leaking param: config
+./embedit.go:52:7: leaking param: e to result ~r0 level=0
+./embedit.go:59:7: leaking param: e to result ~r0 level=0
+./embedit.go:67:7: leaking param: e to result ~r0 level=0
+# github.com/ardnew/embedit/sys/unix
+sys/unix/termios.go:36:19: value does not escape
+# github.com/ardnew/embedit/sys
+sys/sys_unix.go:20:7: f does not escape
+sys/sys.go:17:7: f does not escape
+sys/sys.go:23:7: f does not escape
+sys/sys.go:32:7: f does not escape
+sys/sys_unix.go:25:7: f does not escape
+sys/sys_unix.go:29:7: f does not escape
+sys/sys.go:39:7: f does not escape
+sys/sys_unix.go:41:7: f does not escape
+sys/sys.go:45:7: f does not escape
+# github.com/ardnew/embedit/examples/analysis
+examples/analysis/run_pprof.go:23:10: fn does not escape
+examples/analysis/run_pprof.go:34:8: func literal does not escape
+examples/analysis/main.go:79:38: []rune{...} does not escape
+examples/analysis/main.go:81:38: []rune{...} does not escape
+examples/analysis/main.go:83:38: []rune{...} does not escape
+examples/analysis/main.go:106:23: []rune{...} does not escape
